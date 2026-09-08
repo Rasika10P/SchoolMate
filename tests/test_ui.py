@@ -488,3 +488,18 @@ def test_about_project_and_architecture_need_no_io(monkeypatch):
     assert not page.exception
     assert not page.metric and not page.code
     forbidden.assert_not_called()
+
+
+
+def test_outside_programmes_work_without_database(monkeypatch):
+    app.generate_guide.clear()
+    forbidden = MagicMock(side_effect=AssertionError("Programme catalogue needs no database"))
+    monkeypatch.setattr(app, "_hydrate", forbidden)
+    result = app.generate_guide("math", 2, None, "competition_prep", "deterministic")
+    assert "Math Kangaroo" in result["answer"]
+    assert result["content"] is None
+    forbidden.assert_not_called()
+    unavailable = app.generate_guide("hss", 2, None, "competition_prep", "deterministic")
+    assert unavailable["tool_results"]["state"] == "not_published"
+    assert unavailable["answer"] == NOT_PUBLISHED_REASON["hss", "programs"]
+    app.generate_guide.clear()

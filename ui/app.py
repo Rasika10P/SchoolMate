@@ -81,7 +81,8 @@ def _hydrate(subject: str, grade: int, domain: str | None) -> dict[str, Any]:
 @st.cache_data(show_spinner=False)
 def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode: str) -> dict[str, Any]:
     """Five-key cache: identical submissions do not repeat graph or database work."""
-    content = _hydrate(subject, grade, domain)
+    # Programme recommendations come from the catalogue, not Postgres.
+    content = None if goal == "competition_prep" else _hydrate(subject, grade, domain)
     tab = "standing" if goal == "on_grade_level" else "next_steps"
     if goal != "competition_prep" and supports(subject, tab, grade) and content.get("data_state") == "not_loaded":
         return {"content": content, "answer": content["data_reason"],
