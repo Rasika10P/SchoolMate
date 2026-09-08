@@ -1,0 +1,3 @@
+@metadata {"framework_id": "CA-VAPA-2019", "subject": "vapa", "document_title": "California Arts Education Framework (2020 adoption, 2021 publication)", "source_url": "https://www.cde.ca.gov/ci/cr/cf/documents/caartsedfw.pdf", "page": 75, "grade": null}
+
+Feedback should preserve the opportunity for student inquiry and self-discovery while directing further investigation.

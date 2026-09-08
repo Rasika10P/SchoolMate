@@ -1,0 +1,4 @@
+from_framework,from_code,to_framework,to_code,relation
+CA-CCSSM-2013,3.NF.A.1,CA-CCSSM-2013,4.NF.A.1,prerequisite
+CA-CCSSM-2013,4.NF.A.1,CA-CCSSM-2013,5.NF.A.1,prerequisite
+CA-CCSSM-2013,3.NF.A.1,CA-CCSSM-2013,5.NF.A.1,prerequisite

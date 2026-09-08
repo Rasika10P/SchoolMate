@@ -1,0 +1,3 @@
+@metadata {"framework_id": "CA-ELD-2012", "subject": "eld", "document_title": "2014 ELA/ELD Framework, Chapter 2", "source_url": "https://www.cde.ca.gov/ci/rl/cf/documents/elaeldfwchapter2.pdf", "page": 87, "grade": null}
+
+All students share ideas and encourage table mates to contribute.

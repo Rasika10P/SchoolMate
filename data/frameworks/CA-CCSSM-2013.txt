@@ -1,0 +1,369 @@
+@metadata {"framework_id": "CA-CCSSM-2013", "subject": "math", "document_title": "Mathematics Framework Summary (2023)", "source_url": "https://www.cde.ca.gov/ci/ma/cf/documents/mathfwsummary.pdf", "page": null, "grade": null}
+
+
+MATHEMATICS FRAMEWORK
+for California Public Schools
+Kindergarten Through Grade Twelve
+Adopted by the California State Board
+of Education November 2023
+Published by the California Department
+of Education Sacramento, 2024
+Summary 1
+SUMMARY
+@page 1
+What Is the Mathematics Framework?
+The purpose of the 2023 Mathematics Framework for California Public Schools
+(Mathematics Framework) is to support the implementation of the California Common
+Core State Standards for Mathematics (CA CCSSM). Adopted in 2010 and updated in
+2013, the standards put forth the state’s vision for mathematics, kindergarten through
+grade twelve (K–12), mapping out what students need to know and be able to do in
+math by the end of each grade level. The framework offers guidance for enacting the
+standards through curriculum and instructional approaches grounded in research and
+reflecting best practices across the globe. The goal is to ensure equity and excellence
+in math learning so that all California students become powerful users of mathematics
+to better understand and positively impact the world—in their careers, in college, and
+in civic life.
+@page 2
+Why a New Framework?
+Given the status of mathematics access and achievement, California and the
+United States need to develop new approaches for deepening math learning,
+addressing achievement gaps, and modernizing instruction to meet the demands
+of a fast-changing world. The US has long rated below the international average in
+mathematics on the Programme for International Student Assessment (PISA), and
+scores have declined since PISA began in 2000. Currently, American fifteen-year-olds
+score lower than those in 30 other education systems. And California students score
+below the US average in mathematics with greatly inequitable achievement outcomes
+for historically underserved students of color and those from low-income families.
+
+@page 3
+Summary 2
+
+To address the urgency to improve mathematics learning, the framework provides
+new guidance for curriculum and instruction that builds on a body of research on
+effective mathematics teaching and learning and the successful approaches used
+in nations that produce high and equitable achievement in math. Helping students
+develop the thinking skills and content knowledge necessary to master the standards
+is critical to improving academic performance and creating conditions for later
+success. The 2023 Mathematics Framework includes strategies to support educators
+to integrate California’s Standards for Mathematical Practice in ways that challenge,
+engage, and support all students in deep and relevant math content learning.
+Drawing on the experiences of educators who have worked for years to develop
+successful strategies for teaching California’s rigorous standards, the framework’s
+strategies and practices aim to ensure that all students develop deep skills and a
+love of mathematics and that many more choose to pursue a science, technology,
+engineering, or math (STEM) major in college or pursue other careers that benefit
+from quantitative knowledge and reasoning. Strong mathematical knowledge will
+better enable all of California’s students to thrive as citizens in a complex world.
+What’s in the Mathematics Framework?
+The 2023 Mathematics Framework includes guidance that will help educators
+structure the teaching of the state’s rigorous standards around “Big Ideas” that
+integrate rather than isolate transitional kindergarten through grade twelve (TK–
+12) math concepts—a best practice in high-performing countries. This approach
+encourages teachers to think about how the Big Ideas in mathematics connect within
+and across grade levels in developmental progressions. It emphasizes developing
+the habits of mind and interaction described in the Standards for Mathematical
+Practice—for example, persevering in problem-solving, explaining one’s thinking,
+and constructing arguments—that students need to become powerful users of
+mathematics and better interpret and understand their world.
+The framework’s instructional approach connects learning to the “real world” through
+authentic examples and the use of data, an approach that not only addresses “Why do
+I need to learn this?” but sparks student curiosity and encourages inquiry, problemsolving, and deep learning. The framework also emphasizes students’ need to
+have opportunities to explicitly connect their conceptual understanding with facts
+and procedures in ways that make sense to them so that they can use known facts,
+including those drawn from memory, to determine unknown facts and develop
+fluency.
+The framework draws on research that illustrates how all students can become
+productive mathematics learners and continue their progress through advanced
+coursework that can prepare them for STEM and other quantitative careers,
+supporting both high achievers and those who may need additional assistance.
+The framework encourages schools to enable students to reach higher levels of
+mathematics learning through expert teaching focused on deep understanding,
+differentiated instruction, personalized learning, strategic grouping, additional
+course-taking opportunities, and acceleration into more advanced courses at multiple
+junctures when students are ready. It discusses the conditions research has found to
+be associated with successful acceleration, and it provides guidance about multiple 
+
+@page 4
+Summary 3
+strategies, in addition to acceleration, for ensuring that students have the opportunity
+to reach advanced mathematics courses, such as calculus and statistics, during high
+school.
+The framework draws on research that describes how to help students develop
+a growth mindset in mathematics, which bolsters perseverance, confidence, and
+achievement. It also includes guidance to help educators make mathematics
+instruction culturally relevant and empowering, thus allowing students to see
+themselves in the curriculum and in math-related careers. The pedagogical strategies
+it highlights have been found to promote higher and more equitable engagement
+and achievement for students who have been historically underrepresented in STEM
+careers, including girls and African American, Native American, Latinx, and Pacific
+Islander students. The framework supports instruction for linguistically and culturally
+diverse English learners who are developing mathematical proficiency informed by
+the California English Language Development Standards (CA ELD Standards) and the
+California Department of Education advice for integrating the CA ELD Standards into
+mathematics teaching. It incorporates explicit guidance for planning assessment and
+instructional materials adoptions that are responsive to English learner needs.
+In response to the explosion of data use in our daily lives and across fields, the
+framework highlights the opportunities data presents for bringing mathematics alive
+for students. It discusses ways to integrate data use into math instruction throughout
+the grades and to encourage students to become proficient at understanding and
+using data—including helping students use data to make decisions in their roles as
+global citizens and identify misleading data so their decisions are sound.
+Aligning with State Board of Education guidelines and the CA CCSSM, the framework
+details how students can progress through two high school pathways—Traditional
+and Integrated—and clarifies the autonomy of local schools and districts in designing
+courses and pathways that best meet the needs of local families. The guidance helps
+educators integrate and align math concepts taught at the middle and high school
+levels, ensure that all high school math pathways are open to all students, and expand
+high school math course options to encourage more students to go beyond minimum
+course-taking requirements to pursue areas of mathematics that are interesting and
+useful to them in their current pursuits and aspirations.
+The content of each of the framework chapters is described below.
+Chapter 1—Mathematics for All: Purpose,
+Understanding, and Connection
+
+@page 5
+Chapter 1 introduces and sets up the Mathematics Framework, which lays out the
+curricular and instructional approaches that evidence suggests will afford all students
+the opportunities they need to learn meaningful and rigorous mathematics, meet
+state mathematics standards, access pathways to high-level mathematics courses,
+and achieve success. The CA CCSSM were adopted in 2010 and modified in 2013.
+The standards map out what California students need to know and be able to do,
+grade by grade, in mathematics. Built upon principles of focus, coherence, and rigor,
+they hold the promise of enabling all California students to become powerful users 
+
+@page 6
+Summary 4
+
+of mathematics in order to better understand and positively impact the world. To
+fulfill that promise and reach the goal of deep, active learning of mathematics for
+all, the framework is centered around the investigation of Big Ideas in mathematics,
+connected to authentic, real-world contexts and taught in multidimensional ways that
+meet varied learning needs. While this approach to mathematics education may be a
+tall order, research shows that it is the means to both provide access for all students
+and teach mathematics effectively. Chapter 1 also provides an overview of how
+subsequent chapters are organized.
+Chapter 2—Teaching for Equity and Engagement
+Chapter 2 focuses on how teachers can create equitable and engaging mathematics
+classroom environments, TK–12, that support all students and improve mathematics
+access and outcomes. The chapter describes dimensions of the system that
+contribute to access and equity and expands on the five components of instructional
+design, which are introduced in chapter 1, that encourage equitable outcomes and
+active student engagement:
+• teaching Big Ideas,
+• using open tasks,
+• teaching for social justice,
+• inviting students’ questions and conjectures, and
+• prioritizing reasoning and justification.
+Instruction that incorporates these components can enable a diverse group of
+students to see themselves as mathematically capable individuals whose curiosity and
+love of mathematics learning will be sustained throughout their schooling.
+
+@page 7
+
+Chapter 3—Number Sense
+By way of an in-depth discussion of number sense, chapter 3 illustrates how
+the progression of mathematical concepts occurs across TK–12 as elementary,
+middle, and high school teachers use investigations and connections to teach the
+mathematical Big Ideas of each grade level. The chapter shows that number sense
+can itself be described as a progression of Big Ideas, which include, for example:
+• in transitional kindergarten through grade two, organizing and counting with
+numbers;
+• in grades three through five, extending flexibility with numbers;
+• in grades six through eight, number line understanding; and
+• in grades nine through twelve, seeing parallels between numbers and
+functions.
+The chapter emphasizes the growth of number fluency—the ability to use strategies
+that are flexible, efficient, and accurate—and highlights the value of math talks and
+games, which encourage students’ mental problem-solving and communication as
+well as playful exploration and skill practice.
+@page 8
+
+Summary 5
+Chapter 4—Exploring, Discovering, and Reasoning
+With and About Mathematics
+Chapter 4 goes deeply into California’s Standards for Mathematical Practice,
+providing an important background for discussing how elementary, middle, and
+high school teachers teach the Big Ideas of mathematics (see chapters 6, 7, and 8).
+The Standards for Mathematical Practice embed the habits of mind and habits of
+interaction—for example, persevering in problem-solving, explaining one’s thinking,
+and constructing arguments—that form the basis of mathematics learning. Using
+three interrelated Standards for Mathematical Practice for illustration, the chapter
+demonstrates how key mathematical practices, integrated with each other, can help
+teachers across grade levels create powerful mathematics experiences centered on
+exploring, discovery, and reasoning—thus enabling students to develop and deepen
+those skills, in relation to progressions in mathematics content, as they move through
+the grades.
+
+@page 9
+Chapter 5—Mathematical Foundations for Data
+Science
+This chapter is a first step in helping educators identify how the CA CCSSM can
+support K–12 students in developing foundational knowledge and skills for using data
+as a tool for mathematical problem-solving. Like number sense, which is discussed
+in chapter 3, foundations of data science are embedded in mathematics at all grade
+levels. Making sense of data, identifying misleading uses of data, and using data to
+make decisions are all important skills for students in their roles as global citizens.
+Developing these abilities requires that students generate questions and work with
+data beginning in kindergarten (or before). This work should continue and increase
+in depth and complexity throughout their school careers. Across all grade levels,
+students should be encouraged and supported in understanding and describing
+tendencies and variability in data and data distributions; considering data collection,
+sampling, and random processes; and comparing distributions and identifying
+associations between variables. Students who wish to focus extra attention on data
+science should have an opportunity to pursue advanced courses in high school.
+Chapter 6—Mathematics: Investigating and
+Connecting, Transitional Kindergarten Through
+
+@page 10
+
+Grade Five
+This chapter discusses how the approach to mathematics teaching unfolds throughout
+elementary school. Mathematics in transitional kindergarten through grade five is a
+vibrant, interactive, student-centered endeavor of investigating and connecting the
+Big Ideas of mathematics. In these grades, children experience enormous growth in
+maturity, reasoning, and conceptual understanding. They develop an understanding
+of concepts that include place value, arithmetic operations, fractions, geometric
+shapes and properties, and measurement. Building on this deep understanding, they
+also develop fluency, including the ability to retrieve and use facts and procedures 
+Summary 6
+as they undertake more complex topics. The chapter examines how teachers can
+use meaningful mathematics activities that nourish curiosity and develop reasoning
+skills while simultaneously connecting content and mathematical practices within
+and across grade levels. Students who have gained an understanding of elementary
+mathematics and enter sixth grade viewing themselves as mathematically capable are
+positioned for success in middle school and beyond.
+Chapter 7—Mathematics: Investigating and
+Connecting, Grades Six Through Eight
+This chapter discusses how the approach to mathematics teaching unfolds
+throughout middle school. Building on the foundational understanding of
+mathematics concepts developed in transitional kindergarten through grade five,
+middle school’s major topics include proportional reasoning, rational numbers, and
+measurement in geometrical and data science scenarios—all developed through
+activities that are situated in intriguing, authentic contexts and require students to
+build connections among ideas. The critical element of success continues to be
+piquing students’ curiosity and interest through engagement with meaningful and
+relevant mathematics activities and experiences. As the chapter discusses, students’
+middle school experiences are pivotal in shaping their attitudes toward mathematics
+and self-perceptions as mathematics learners. Those experiences, combined with the
+guidance they receive, determine whether or not students get on a pathway to highlevel mathematics, crucially affecting their mathematics futures in high school and
+beyond.
+
+@page 11
+
+Chapter 8—Mathematics: Investigating and
+Connecting, High School
+This chapter discusses how the approach to mathematics teaching unfolds throughout
+high school. California’s high school mathematics content standards are organized
+into conceptual categories:
+• number and quantity;
+• algebra;
+• functions;
+• modeling;
+• geometry; and
+• statistics and probability.
+This chapter provides an overview of the traditional and integrated pathways schools
+may offer and describes the mathematical content that students learn in the courses
+associated with each pathway. It also describes the range of third- and fourth-year
+high school mathematics course options from which students may choose to reflect
+their interests and future aspirations and clarifies the expectations for coursework
+leading to different higher education options, including STEM careers.
+Summary 7
+Examples are included of how course content can support the Standards for
+Mathematical Practice. The pathways integrate content with mathematics practices—
+that is, the investigation/connection approach of the framework enables students
+to develop a disposition toward reasoning and communication in mathematics,
+knowledge of mathematical ideas and skills, and the ability to think both critically
+and creatively in solving problems. As this chapter discusses, teaching this way
+requires careful consideration of many issues in addition to learning goals, including
+motivation, coherence, students’ and teachers’ cultural and linguistic assets, access
+and equity, context, and sustainability.
+
+@page 12
+Chapter 9—Structuring School Experiences for
+Equity and Engagement
+Chapter 9 describes methods of teaching and coursework designs that can enable
+all students to be appropriately challenged and many more to reach advanced
+mathematics—without requiring that all students work on the same mathematics or
+be placed in inflexible course sequences that make it difficult for them to move into
+or between STEM or non-STEM pathways if they so choose. As with appropriate
+course sequencing (described in chapter 8), the goal is to expand access to rigorous
+mathematics for all students, allowing each student to experience the joy and
+excitement of well-taught mathematics in ways that stimulate their learning and
+engagement.
+Chapter 10—Supporting Educators in Offering
+Equitable and Engaging Mathematics Instruction
+Chapter 10 discusses how to plan and design structured, ongoing, high-quality
+programs of professional learning that support teachers throughout their careers.
+Teaching for equity and engagement is as rewarding as it is complex. Teachers
+who focus on Big Ideas and connections and teach mathematics by way of carefully
+designed, intriguing investigations see their students come alive through exploration
+and discovery. But especially since most teachers did not learn mathematics this way,
+they need support to rethink mathematics teaching and acquire skills and strategies
+that result in the changes in practice vital to improving student learning.
+Chapter 11—Technology and Distance Learning in
+the Teaching of Mathematics
+This chapter provides guidance to help educators enrich students’ learning of the
+mathematics content and practice standards by using technology. Today, a host of
+technologies have the potential to support rich and deep mathematical learning
+for all students. Introducing students to technology is important in itself, given its
+increasingly integral role in our lives. At the same time, this chapter emphasizes that
+using technology in teaching mathematics should support instructional objectives
+and student learning of mathematics, deeply understood. Based on principles
+for technology use in mathematics learning, the chapter recommends adopting
+technology in combination with changes to teaching practices that make the 
+
+@page 13
+Summary 8
+technology an integral and sustained component of the instruction—accompanied by
+high-quality, ongoing professional learning for teachers. The chapter also discusses
+distance learning, features of effective distance learning, and tips for success.
+Chapter 12—Mathematics Assessment in the
+Twenty-First Century
+This chapter encourages educators, administrators, and policymakers to focus on
+assessment that engages students in continuous improvement efforts by using
+mastery-based approaches—notably, by assessing with rubrics and using self, peer,
+and teacher feedback. Such an approach reflects the goal of achieving conceptual
+understanding, problem-solving capacity, and procedural fluency. It also promises
+to maximize the amount of learning each child is capable of while minimizing the
+sociocultural effects of narrow testing. The chapter discusses California’s evolving
+comprehensive assessment system, with its two primary forms of mathematics
+assessments—formative and summative—and how they relate to mathematics
+instruction and learning. In California as nationwide, mathematics assessment is in
+transition, shifting from rote tests of fact-based skills to multidimensional measures of
+procedural skills, problem-solving capacity, and evidence-based reasoning. The shift
+reflects a growing alignment between how mathematics is being taught and how it is
+being tested—in turn reflecting shifting classroom, school, district, and state priorities.
+Chapter 13—Instructional Materials to Support
+Equitable and Engaging Learning of the California
+Common Core State Standards for Mathematics
+
+@page 14
+
+Chapter 13 is directed to the developers and publishers of instructional materials
+and conveys information needed to participate in the State Board of Education
+instructional materials adoption process. It explains the need for developers and
+publishers to provide the content (including coverage, depth, and delivery) to address
+standards while at the same time maintaining coherence as learning progresses
+across grade levels. Materials need to reflect grade-level shifts in Big Ideas, and
+activities need to continue to be relevant to student lives. Resources that bridge
+content and context and provide guidance to teachers—while also allowing the
+flexibility necessary for supporting all students—will be critical for implementing the
+framework. Notably, developers and publishers should consider the lens of equity
+when developing lessons and units to serve California’s diverse student population.
+The chapter also provides guidance for local districts on the adoption of instructional
+materials for students in grades nine through twelve, the social content review
+process, supplemental instructional materials, and accessible instructional materials.
+Summary 9
+Appendix A—Mathematical Progressions within
+the High School Pathways and Key Mathematical
+Ideas to Promote Student Success in Introductory
+University Courses in Quantitative Fields
+This chapter presents key mathematical ideas to promote student success in
+introductory university courses in quantitative fields.
+Appendix B—Works Cited
+This appendix lists all references cited in the framework, by chapter.
+Appendix C—Vignettes
+This appendix contains all vignettes referenced in the framework, by chapter, that are
+longer than two pages. Hyperlinks in the chapters give readers easy access to each
+vignette.
+California Department of Education, June 2023

@@ -1,0 +1,8 @@
+id,state,subject,version,source_url
+CA-CCSSM-2013,California,mathematics,2013,https://www2.cde.ca.gov/cacs/all
+CA-CCSS-ELA-2013,California,english_language_arts,2013,https://www2.cde.ca.gov/cacs/all
+CA-ELD-2012,California,english_language_development,2012,https://www2.cde.ca.gov/cacs/all
+CA-NGSS-2013,California,science,2013,https://www2.cde.ca.gov/cacs/all
+CA-HSS-2016,California,history_social_science,2016,https://www2.cde.ca.gov/cacs/all
+CA-VAPA-2019,California,visual_and_performing_arts,2019,https://www2.cde.ca.gov/cacs/all
+CA-PE-2005,California,physical_education,2005,https://www2.cde.ca.gov/cacs/all

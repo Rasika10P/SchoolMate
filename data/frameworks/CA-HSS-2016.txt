@@ -1,0 +1,3 @@
+@metadata {"framework_id": "CA-HSS-2016", "subject": "hss", "document_title": "California History–Social Science Framework (2016), Chapter 2", "source_url": "https://www.cde.ca.gov/ci/hs/cf/documents/hssfwchapter2.pdf", "page": 23, "grade": null}
+
+They collaboratively work on projects, hands-on investigations, and presentations.

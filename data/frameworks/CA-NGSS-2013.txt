@@ -1,0 +1,3 @@
+@metadata {"framework_id": "CA-NGSS-2013", "subject": "sci", "document_title": "2016 California Science Framework, Chapter 1", "source_url": "https://www.cde.ca.gov/ci/sc/cf/documents/scifwchapter1.pdf", "page": 5, "grade": null}
+
+Scientists have long recognized that building scientific knowledge is a multi-dimensional process.

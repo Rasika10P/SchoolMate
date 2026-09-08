@@ -1,0 +1,17 @@
+.cache/
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+
+# Local configuration, credentials, and generated files
+.env.*
+!.env.example
+.DS_Store
+*.py[cod]
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.pem
+*.key
