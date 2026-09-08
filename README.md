@@ -55,3 +55,27 @@ python -m pytest -q
 
 Curriculum files are included; local credentials, virtual environments, and
 caches are excluded. Remote Postgres and Pinecone contents are not Git backups.
+
+## Publish on Streamlit Community Cloud
+
+1. Sign in at https://share.streamlit.io with GitHub and choose **Create app**.
+2. Select repository `Rasika10P/SchoolMate`, branch `main`, and entrypoint
+   `streamlit_app.py`.
+3. In **Advanced settings**, choose Python 3.12 and paste the root-level TOML
+   keys from [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example),
+   replacing each placeholder with your existing credentials.
+4. Deploy, then set app sharing to **public** in the app's sharing settings.
+
+Use your existing hosted Postgres database and Pinecone index. Deployment does
+not load CSVs or regenerate translations; these stay in your existing services.
+Never paste `.env` shell syntax into Cloud Secrets: values must be TOML strings
+as shown in the example. Do not commit a populated `secrets.toml` file.
+
+The Streamlit version is pinned to the version tested with SchoolMate's tab
+navigation. You can also test the Cloud entrypoint locally:
+
+```sh
+streamlit run streamlit_app.py
+```
+
+[Official deployment instructions](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy)

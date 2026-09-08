@@ -3,5 +3,5 @@ psycopg[binary]>=3.2,<4
 psycopg[pool]>=3.2,<4
 langchain-core>=1,<2
 langgraph>=1,<2
-streamlit>=1.40,<2
+streamlit==1.63.0
 pinecone>=7,<8
