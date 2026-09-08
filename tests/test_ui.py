@@ -503,3 +503,33 @@ def test_outside_programmes_work_without_database(monkeypatch):
     assert unavailable["tool_results"]["state"] == "not_published"
     assert unavailable["answer"] == NOT_PUBLISHED_REASON["hss", "programs"]
     app.generate_guide.clear()
+
+
+
+@pytest.mark.parametrize("path", ["ask", "guided"])
+def test_failed_new_submission_removes_previous_answer(monkeypatch, path):
+    from api.graph import extractor
+    app.st.cache_data.clear()
+    monkeypatch.setattr(extractor, "extract_intent", MagicMock(side_effect=RuntimeError("Provider configuration missing")))
+    monkeypatch.setattr(db, "get_conn", MagicMock(side_effect=RuntimeError("DATABASE_URL must be set")))
+    page = new_page()
+    page.session_state.stage = "results"
+    page.session_state.results = dict(content=None, answer="OLD MATH PROGRAMMES", subject="math", grade=2, goal="competition_prep")
+    page.run()
+    assert "OLD MATH PROGRAMMES" in [m.value for m in page.markdown]
+    if path == "ask":
+        page.text_area[0].set_value("What do children learn in grade 2 English?")
+        label = "Ask"
+    else:
+        page.selectbox(key="guide_subject").set_value("ela")
+        page.selectbox(key="guide_grade").set_value(2)
+        page.selectbox(key="guide_goal").set_value("on_grade_level")
+        label = "See guide"
+    next(b for b in page.button if b.label == label).click().run()
+    assert not page.exception
+    assert page.error
+    assert page.session_state.stage == "entry"
+    assert "OLD MATH PROGRAMMES" not in [m.value for m in page.markdown]
+    assert page.session_state.last_error_detail
+    page.run()
+    assert "OLD MATH PROGRAMMES" not in [m.value for m in page.markdown]

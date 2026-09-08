@@ -149,10 +149,18 @@ def _record_usage(before: tuple[int, int, float, int], started: float, mode: str
         st.session_state.submission_usage = metrics
 
 
+def _begin_submission() -> None:
+    """A previous answer must never appear to answer a new, failed request."""
+    st.session_state.pop("results", None)
+    st.session_state.pop("last_error_detail", None)
+    st.session_state.stage = "entry"
+
+
 def _submit_guide(subject: str | None, grade: int | None, goal: str | None, learner: str) -> None:
     if any(value is None for value in (subject, grade, goal)):
         st.warning("Please choose a subject, grade, and goal before continuing.")
         return
+    _begin_submission()
     before, started = _usage_snapshot(), perf_counter()
     mode = st.session_state.mode
     try:
@@ -203,6 +211,7 @@ def entry_screen() -> None:
             if not question.strip():
                 st.warning("Please enter a question first.")
                 return
+            _begin_submission()
             before, started = _usage_snapshot(), perf_counter()
             try:
                 with st.spinner("Reviewing your question…"):
