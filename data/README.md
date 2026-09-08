@@ -155,3 +155,26 @@ headings. Each section contains a one-line description, learning rows, and
 nested official-wording expanders. Sources also start collapsed. Existing
 publication gates and unmapped-progression messages remain in effect. Use
 “Refresh guide text” to read newly saved overviews into an already open guide.
+
+### Suggest progression links for review
+
+```sh
+python scripts/suggest_edges.py --framework CA-CCSS-ELA-2013
+```
+
+Reads the framework's subject CSV locally, with no database or model calls.
+Writes `data/suggestions/CA-CCSS-ELA-2013-candidates.csv` and a companion
+`-unmatched.csv`, and prints standards with no incoming or outgoing candidate.
+Use `--output` and `--unmatched-output` to choose new output filenames.
+Existing files and `progression.csv` cannot be overwritten.
+
+Candidates match strand/domain and within-strand number across adjacent grades
+(e.g. `RL.1.1` → `RL.2.1`). This is an identifier heuristic, not an official
+prerequisite mapping. Subparts and ELD proficiency levels remain distinct.
+Unsupported formats, grade bands, and ambiguous grades appear in the unmatched
+report; HSS identifiers alone do not establish a shared cross-grade strand.
+
+Review the full source texts and URLs in the candidate CSV. The `relation`
+column is intentionally blank. Only after confirming a relationship, assign
+its relation and copy the five progression columns into `progression.csv`;
+do not append the review-only columns. The script never changes live edges.
