@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib import Path
 import logging
+import re
+from urllib.parse import urlparse
 import sys
 from time import perf_counter
 from typing import Any
@@ -62,8 +64,8 @@ def _hydrate(subject: str, grade: int, domain: str | None) -> dict[str, Any]:
                 forward.extend(walk(conn, standard.framework_id, standard.code, "forward"))
                 backward.extend(walk(conn, standard.framework_id, standard.code, "backward"))
         overview_ids = [(framework_id, grade)]
-        overview_ids += [(step.standard.framework_id, step.standard.grade) for step in forward
-                         if step.standard.grade == grade + 1]
+        overview_ids += [(step.standard.framework_id, step.standard.grade) for step in forward + backward
+                         if step.standard.grade is not None]
         overviews = get_overviews(conn, overview_ids)
     return {
         "overviews": overviews,
@@ -285,20 +287,35 @@ def _next_standards(content: dict[str, Any], grade: int) -> list[dict[str, Any]]
     return list(rows.values())
 
 
+def _earlier_standards(content: dict[str, Any], grade: int) -> list[dict[str, Any]]:
+    rows = {}
+    for step in content["backward"]:
+        record = step["standard"]
+        if record.get("grade") is not None and record["grade"] < grade:
+            rows.setdefault((record["framework_id"], record["code"]), record)
+    return list(rows.values())
+
+
 def _standards_table(records: list[dict[str, Any]]) -> None:
-    if not records:
-        return
-    left, right = st.columns(2)
-    left.markdown("**What your child learns**")
-    right.markdown("**What this looks like**")
-    for record in records:
-        with st.container():
-            left, right = st.columns(2)
-            left.write(record.get("plain_summary") or record["text"])
-            right.write(record.get("plain_example") or "—")
-            with st.expander("See the official wording"):
+    """Compact stacked entries; show official fallback exactly once."""
+    for index, record in enumerate(records):
+        if index:
+            st.divider()
+        summary = (record.get("plain_summary") or "").strip()
+        example = (record.get("plain_example") or "").strip()
+        translated = bool(summary and summary != record["text"].strip())
+        if translated:
+            st.write(summary)
+        else:
+            st.caption("Official wording")
+            st.write(record["text"])
+        if example:
+            st.markdown("**Everyday example**")
+            st.write(example)
+        with st.expander("See the official wording" if translated else "Standard reference"):
+            if translated:
                 st.write(record["text"])
-                st.text(f"{record['code']} · {record['framework_id']}")
+            st.text(f"{record['code']} · {record['framework_id']}")
 
 
 def _domain_sections(records: list[dict[str, Any]], grade: int, overviews: dict[str, str]) -> None:
@@ -307,14 +324,14 @@ def _domain_sections(records: list[dict[str, Any]], grade: int, overviews: dict[
     frameworks = sorted({record["framework_id"] for record in records})
     for framework in frameworks:
         text = overviews.get(f"{framework}|{grade}")
-        if text:
+        if text and len(re.split(r"(?<=[.!?])\s+", text.strip())) <= 2:
             st.write(text)
         else:
             # A useful static fallback until the offline job stores an overview.
             areas = sorted({domain_label(r["domain"], grade)[0].lower()
                             for r in records if r["framework_id"] == framework})
             st.write("This grade includes " + ", ".join(areas) +
-                     ". Open an area to explore the learning. Each section includes the official wording.")
+                     ". Open an area to see the skills and any available everyday examples.")
     groups: dict[str, list[dict[str, Any]]] = {}
     for record in records:
         groups.setdefault(record["domain"], []).append(record)
@@ -334,15 +351,24 @@ def _source_documents(content: dict[str, Any], subject: str, grade: int) -> list
         records += content["standing"]
     records += content["programs"].get("programs", [])
     documents: dict[str, set[int]] = {}
+    titles: dict[str, str] = {}
     for record in records:
         url = record.get("source_url")
         if not url:
             continue
         pages = documents.setdefault(url, set())
+        name = next((SUBJECT_LABELS[key].lower() for key, framework in FRAMEWORK_BY_SUBJECT.items()
+                     if framework == record.get("framework_id")), SUBJECT_LABELS[subject].lower())
+        title = record.get("document_title") or record.get("source_title")
+        if not title:
+            title = f"California {name} standards" if urlparse(url).hostname in {"www.cde.ca.gov", "www2.cde.ca.gov"} else f"{name.capitalize()} source document"
+            if "/id/web/" in url and record.get("domain"):
+                title += " — " + domain_label(record["domain"], grade)[0]
+        titles.setdefault(url, title)
         if record.get("page") is not None:
             pages.add(record["page"])
-    return [{"url": url, "pages": (f"Page {min(pages)}" if len(pages) == 1 else
-             f"Pages {min(pages)}–{max(pages)}") if pages else "Page not recorded"}
+    return [{"url": url, "title": titles[url], "pages": (f"Page {min(pages)}" if len(pages) == 1 else
+             f"Pages {min(pages)}–{max(pages)}") if pages else ""}
             for url, pages in sorted(documents.items())]
 
 
@@ -350,7 +376,8 @@ def _sources(content: dict[str, Any], subject: str, grade: int) -> None:
     with st.expander("Sources", expanded=False):
         documents = _source_documents(content, subject, grade)
         for document in documents:
-            st.write(f"{document['url']} — {document['pages']}")
+            suffix = f" — {document['pages']}" if document['pages'] else ""
+            st.markdown(f"[{document['title']}]({document['url']}){suffix}")
         if not documents:
             st.write("Source documents have not been recorded for these results.")
 
@@ -397,7 +424,8 @@ def results_screen() -> None:
         try:
             _refresh_translations(content)
             overview_ids = [(FRAMEWORK_BY_SUBJECT[subject], grade)]
-            overview_ids += [(r["framework_id"], grade + 1) for r in _next_standards(content, grade)]
+            overview_ids += [(r["framework_id"], r["grade"]) for r in
+                             _next_standards(content, grade) + _earlier_standards(content, grade)]
             with get_conn() as conn:
                 content["overviews"] = get_overviews(conn, overview_ids)
         except Exception as exc:
@@ -406,8 +434,9 @@ def results_screen() -> None:
         st.warning("This guide contains illustrative sample data, not official California wording.")
     with st.expander("Answer for your selected goal"):
         st.write(result["answer"])
-    tabs = st.tabs(["Standards", "Next steps", "Standing", "Activities", "Programs"])
-    for tab, key in zip(tabs, ("standards", "next_steps", "standing", "activities", "programs")):
+    catching_up = result.get("goal") == "catching_up"
+    tabs = st.tabs(["Learning this year", "Skills to revisit" if catching_up else "Next steps", "Activities", "Outside programmes"])
+    for tab, key in zip(tabs, ("standards", "next_steps", "activities", "programs")):
         with tab:
             supported = supports(subject, key, grade)
             programs = content["programs"]
@@ -422,20 +451,25 @@ def results_screen() -> None:
                 if not content["standards"]:
                     st.info(content.get("data_reason", f"{SUBJECT_LABELS[subject]} data for {grade_label(grade)} has not been loaded yet."))
             elif key == "next_steps":
-                next_records = _next_standards(content, grade)
-                if next_records:
-                    st.write("Once these are comfortable, children usually move on to:")
-                    _domain_sections(next_records, grade + 1, content.get("overviews", {}))
-                elif not content["forward"] and not content["backward"]:
-                    st.info("The sequence has not been mapped for this subject yet.")
+                if catching_up:
+                    earlier = _earlier_standards(content, grade)
+                    if earlier:
+                        st.write("These earlier skills connect to the learning in this grade. Choose an area to revisit together.")
+                        for earlier_grade in sorted({r["grade"] for r in earlier}, reverse=True):
+                            st.markdown(f"**{grade_label(earlier_grade)} skills**")
+                            _domain_sections([r for r in earlier if r["grade"] == earlier_grade],
+                                             earlier_grade, content.get("overviews", {}))
+                    else:
+                        st.info("Earlier skill connections have not been mapped for this subject and grade yet.")
                 else:
-                    st.info("The sequence to the next grade has not been mapped for these skills yet.")
-            elif key == "standing":
-                for level in content["standing"]:
-                    st.write(level["text"])
-                    st.caption(f"Achievement level {level['level']}")
-                if not content["standing"]:
-                    st.info("No achievement descriptions are loaded for this grade yet.")
+                    next_records = _next_standards(content, grade)
+                    if next_records:
+                        st.write("Once these are comfortable, children usually move on to:")
+                        _domain_sections(next_records, grade + 1, content.get("overviews", {}))
+                    elif not content["forward"] and not content["backward"]:
+                        st.info("The sequence has not been mapped for this subject yet.")
+                    else:
+                        st.info("The sequence to the next grade has not been mapped for these skills yet.")
             elif key == "activities":
                 st.info("Sourced activities have not been added to this guide yet.")
             elif key == "programs":

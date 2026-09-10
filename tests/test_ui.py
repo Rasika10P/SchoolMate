@@ -77,8 +77,8 @@ def test_results_reruns_only_read_saved_data(monkeypatch: pytest.MonkeyPatch) ->
                                       subject="hss", grade=4, domain=None, goal="catching_up", mode="deterministic")
     page.run()
     assert not page.exception
-    assert [tab.label for tab in page.tabs if tab.label not in ("Guide", "About")] == ["Guided setup", "Ask me anything", "Standards", "Next steps", "Standing", "Activities", "Programs"]
-    assert NOT_PUBLISHED_REASON["hss", "standing"] in [item.value for item in page.info]
+    assert [tab.label for tab in page.tabs if tab.label not in ("Guide", "About")] == ["Guided setup", "Ask me anything", "Learning this year", "Skills to revisit", "Activities", "Outside programmes"]
+    assert not any(tab.label == "Standing" for tab in page.tabs)
     navigate(page, 'About')
     page.radio(key="_mode_choice").set_value("agent").run()
     navigate(page, 'Guide')
@@ -198,10 +198,10 @@ def test_parent_rows_official_expanders_next_grade_and_sources(monkeypatch):
     assert '1.CC.1' in expanders[1].text[0].value
     assert not any('CC.1' in m.value for m in page.markdown)
     values = [m.value for m in page.markdown]
-    assert values.count('**What your child learns**') == 2
-    assert values.count('**What this looks like**') == 2
+    assert '**What your child learns**' not in values
+    assert values.count('**Everyday example**') == 2
     assert 'Once these are comfortable, children usually move on to:' in values
-    assert values.count('https://example.org/document.pdf — Pages 2–5') == 1
+    assert sum('(https://example.org/document.pdf) — Pages 2–5' in v for v in values) == 1
     assert not any('Source document:' in c.value for c in page.caption)
     page.run()
     forbidden.assert_not_called()
@@ -238,8 +238,10 @@ def test_missing_translation_shows_official_wording_without_model_calls(monkeypa
     page.run()
     page.run()
     assert not page.exception
-    # Both table rows and both official-wording expanders retain the exact text.
-    assert [m.value for m in page.markdown].count('Exact official text.') == 4
+    # Official fallback appears once per entry, without a duplicate expander.
+    assert [m.value for m in page.markdown].count('Exact official text.') == 2
+    assert not any(e.label == 'See the official wording' for e in page.expander)
+    assert '—' not in [m.value for m in page.markdown]
     assert not any('available yet' in m.value for m in page.markdown)
     forbidden.assert_not_called()
 
@@ -296,7 +298,7 @@ def test_domains_collapsed_with_saved_overview_in_both_tabs(monkeypatch):
     page.run()
     assert not page.exception
     for tab, overview, headings in [
-        (next(t for t in page.tabs if t.label == "Standards"), 'Saved current overview.', ['Adding and subtracting', 'Shapes and space']),
+        (next(t for t in page.tabs if t.label == "Learning this year"), 'Saved current overview.', ['Adding and subtracting', 'Shapes and space']),
         (next(t for t in page.tabs if t.label == "Next steps"), 'Saved next overview.', ['Adding and subtracting']),
     ]:
         # Only the overview/continuity line and domain expanders are direct tab children.
@@ -533,3 +535,56 @@ def test_failed_new_submission_removes_previous_answer(monkeypatch, path):
     assert page.session_state.last_error_detail
     page.run()
     assert "OLD MATH PROGRAMMES" not in [m.value for m in page.markdown]
+
+
+
+def test_catching_up_shows_only_earlier_grade_links(monkeypatch):
+    forbidden = MagicMock(side_effect=AssertionError("No model during rendering"))
+    monkeypatch.setattr(llm, "cached_complete", forbidden)
+    payload = content()
+    payload["standards"] = [record("2.OA.1", 2)]
+    payload["backward"] = [dict(standard=record("1.OA.1", 1)),
+                            dict(standard=record("1.OA.1", 1)),
+                            dict(standard=record("2.OA.2", 2))]
+    payload["forward"] = [dict(standard=record("3.OA.1", 3))]
+    page = new_page()
+    page.session_state.stage = "results"
+    page.session_state.results = dict(content=payload, answer="Saved", subject="math", grade=2, goal="catching_up")
+    page.run()
+    assert not page.exception
+    tab = next(t for t in page.tabs if t.label == "Skills to revisit")
+    codes = [t.value for t in tab.text]
+    assert len(codes) == 1 and "1.OA.1" in codes[0]
+    page.run()
+    forbidden.assert_not_called()
+
+
+def test_sources_have_descriptive_links_and_optional_pages():
+    payload = content()
+    payload["standards"] = [record(page=None) | {"source_url": "https://www2.cde.ca.gov/cacs/math"}]
+    docs = app._source_documents(payload, "math", 0)
+    assert docs == [{"url": "https://www2.cde.ca.gov/cacs/math", "title": "California mathematics standards", "pages": ""}]
+    page = new_page()
+    page.session_state.stage = "results"
+    page.session_state.results = dict(content=payload, answer="Saved", subject="math", grade=0, goal="on_grade_level")
+    page.run()
+    assert not page.exception
+    values = [m.value for m in page.markdown]
+    assert '[California mathematics standards](https://www2.cde.ca.gov/cacs/math)' in values
+    assert not any('Page not recorded' in v for v in values)
+
+
+def test_identical_summary_is_displayed_once_and_long_overview_is_compact():
+    payload = content()
+    payload["standards"] = [record() | {"plain_summary": "Exact official text.", "plain_example": ""}]
+    payload["overviews"] = {"CA-CCSSM-2013|0": "First. Second. Third. Fourth."}
+    page = new_page()
+    page.session_state.stage = "results"
+    page.session_state.results = dict(content=payload, answer="Saved", subject="math", grade=0, goal="on_grade_level")
+    page.run()
+    assert not page.exception
+    values = [m.value for m in page.markdown]
+    assert values.count("Exact official text.") == 1
+    assert "First. Second. Third. Fourth." not in values
+    assert any(v.startswith("This grade includes ") for v in values)
+    assert not any(e.label == "See the official wording" for e in page.expander)

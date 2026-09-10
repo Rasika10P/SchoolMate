@@ -15,8 +15,10 @@ def test_csvs_are_typed_and_endpoints_exist() -> None:
     edges = load.read_csv(DATA / "progression.csv", load.ProgressionEdge)
     descriptors = load.read_csv(DATA / "ald.csv", load.AchievementDescriptor)
     assert standards
-    assert len(edges) == len(descriptors) == 3
-    endpoints = {(row.framework_id, row.code) for row in standards}
+    assert edges and len(descriptors) == 3
+    endpoints = {(row.framework_id, row.code)
+                 for filename, framework in load.SUBJECT_FILES.items()
+                 for row in load.read_subject(DATA / filename, framework)[0]}
     for edge in edges:
         assert (edge.from_framework, edge.from_code) in endpoints
         assert (edge.to_framework, edge.to_code) in endpoints
@@ -157,7 +159,7 @@ def test_all_subjects_load_and_repeat_without_changes(loader_db):
                    for filename, framework in SUBJECT_FILES.items())
     assert {c.table: c.rows for c in report.tables} == {
         'framework': 7, 'standard': expected - 12, 'standard_variant': expected,
-        'progression_edge': 3, 'achievement_descriptor': 3,
+        'progression_edge': len(load.read_csv(DATA / 'progression.csv', load.ProgressionEdge)), 'achievement_descriptor': 3,
     }
     assert report.frameworks['CA-NGSS-2013']['standard'] == 78
     assert report.frameworks['CA-NGSS-2013']['standard_variant'] == 90
@@ -184,6 +186,14 @@ def partial_data(tmp_path):
     import shutil
     for filename in ['frameworks.csv', 'maths.csv', 'progression.csv', 'ald.csv']:
         shutil.copyfile(DATA / filename, tmp_path / filename)
+    # This fixture deliberately loads only maths and three known sample links.
+    # Keep it independent of additions to the reviewed cross-subject edge CSV.
+    import csv
+    with (tmp_path / 'progression.csv').open('w', newline='') as handle:
+        writer = csv.writer(handle)
+        writer.writerow(['from_framework', 'from_code', 'to_framework', 'to_code', 'relation'])
+        for source, target in [('3.NF.A.1', '4.NF.A.1'), ('4.NF.A.1', '5.NF.A.1'), ('3.NF.A.1', '5.NF.A.1')]:
+            writer.writerow(['CA-CCSSM-2013', source, 'CA-CCSSM-2013', target, 'prerequisite'])
     return tmp_path
 
 
