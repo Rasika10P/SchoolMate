@@ -102,9 +102,10 @@ def test_open_question_retrieves_prose_with_original_question(monkeypatch, grade
     assert question in str(model.call_args.kwargs["messages"])
 
 
-def test_open_unavailable_does_not_invent_answer(monkeypatch):
+@pytest.mark.parametrize("status", ["unavailable", "no_relevant_content", "judgement_unavailable"])
+def test_open_unavailable_does_not_invent_answer(monkeypatch, status):
     from api.services import guidance
-    monkeypatch.setattr(guidance, "search", Mock(return_value={"state": "unavailable", "reason": "No prose yet."}))
+    monkeypatch.setattr(guidance, "search", Mock(return_value={"state": status, "reason": "No prose yet."}))
     model = Mock(side_effect=AssertionError("No unsupported synthesis"))
     monkeypatch.setattr(llm, "cached_complete", model)
     result = build_agent_graph().invoke({**state(), "question_type": "open", "question": "Why?", "grade": None, "goal": None})

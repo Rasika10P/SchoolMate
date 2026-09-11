@@ -10,6 +10,13 @@ from api.tools import definitions
 F = FRAMEWORK_BY_SUBJECT['math']
 
 
+@pytest.fixture(autouse=True)
+def relevance_model(monkeypatch):
+    model = MagicMock(return_value={'choices': [{'message': {'content': 'RELEVANT'}}]})
+    monkeypatch.setattr(guidance.llm, 'cached_complete', model)
+    return model
+
+
 @pytest.fixture
 def pinecone(monkeypatch):
     client, index = MagicMock(), MagicMock()
@@ -271,7 +278,7 @@ def test_grade_search_includes_general_prose_but_not_other_grades(pinecone, tmp_
     guidance.ingest(path, F)
     general = next(iter(stored[F].values()))
     for grade in (1, 5):
-        stored[F][f'grade-{grade}'] = {'id': f'grade-{grade}', 'metadata': {
+        stored[F][f'grade-{grade}'] = {'id': f'grade-{grade}', 'score': 0.9, 'metadata': {
             **general['metadata'], 'grade': grade, 'text': f'Grade {grade} teaching.'}}
     result = guidance.search('How is math taught?', F, grade=1)
     assert result['state'] == 'available'
@@ -280,5 +287,46 @@ def test_grade_search_includes_general_prose_but_not_other_grades(pinecone, tmp_
     assert index.query.call_args.kwargs['filter']['framework_id'] == {'$eq': F}
     # Even an incorrect upstream response must not leak another grade.
     index.query.side_effect = None
-    index.query.return_value = {'matches': list(stored[F].values())}
+    index.query.return_value = {'matches': [{**r, 'score': 0.9} for r in stored[F].values()]}
     assert {c['metadata']['grade'] for c in guidance.search('Why?', F, grade=1)['chunks']} == {None, 1}
+
+
+@pytest.mark.parametrize('score,verdict,expected', [(0.81, 'NOT_RELEVANT', 'no_relevant_content'), (0.2, 'RELEVANT', 'available')])
+def test_relevance_not_absolute_score(pinecone, tmp_path, relevance_model, caplog, score, verdict, expected):
+    path = write_prose(tmp_path / 'math.txt', 'Teaching mathematics through objects.')
+    guidance.ingest(path, F)
+    _, index, stored = pinecone
+    index.query.side_effect = None
+    index.query.return_value = {'matches': [{**next(iter(stored[F].values())), 'score': score}]}
+    relevance_model.return_value = {'choices': [{'message': {'content': verdict}}]}
+    with caplog.at_level('INFO', logger=guidance.__name__):
+        result = guidance.search('Which school should I choose?', F)
+    assert result['state'] == expected
+    assert result['top_score'] == score and result['scores'] == [score]
+    assert result['judged'] is True
+    assert str(score) in caplog.text and verdict in caplog.text
+    relevance_model.assert_called_once()
+    prompt = relevance_model.call_args.kwargs['messages']
+    assert 'Which school should I choose?' in prompt[1]['content']
+    assert 'Teaching mathematics through objects.' in prompt[1]['content']
+    if verdict == 'NOT_RELEVANT':
+        assert 'chunks' not in result
+
+
+@pytest.mark.parametrize('reply', ['Maybe relevant', None])
+def test_judgement_failure_is_not_retrieval_failure(pinecone, tmp_path, relevance_model, reply):
+    guidance.ingest(write_prose(tmp_path / 'math.txt', 'Teaching mathematics.'), F)
+    if reply is None:
+        relevance_model.side_effect = RuntimeError('Model offline')
+    else:
+        relevance_model.return_value = {'choices': [{'message': {'content': reply}}]}
+    result = guidance.search('How?', F)
+    assert result['state'] == 'judgement_unavailable'
+    assert result['judged'] is False
+    assert result['top_score'] == 0.9
+    assert 'chunks' not in result
+
+
+def test_empty_namespace_skips_judge(pinecone, relevance_model):
+    assert guidance.search('How?', F)['state'] == 'unavailable'
+    relevance_model.assert_not_called()

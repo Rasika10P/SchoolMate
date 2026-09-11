@@ -105,3 +105,41 @@ metadata for citations. Retrieval is separate from translation generation.
 Implementation references: [Pinecone upserts](https://docs.pinecone.io/guides/index-data/upsert-data),
 [metadata and namespaces](https://docs.pinecone.io/guides/index-data/indexing-overview),
 and [embedding API](https://docs.pinecone.io/reference/api/2026-04/inference/generate-embeddings).
+
+### Relevance judgement after retrieval
+
+`search()` uses no absolute similarity cutoff. After framework/grade filtering,
+nonempty passages go through one `cached_complete` call (default
+`openai/gpt-4o-mini`; override with `GUIDANCE_RELEVANCE_MODEL`). The judgement
+asks whether the passages actually answer the question, not just discuss a
+related topic. The same question and passages reuse the model cache.
+
+Results distinguish:
+
+- `available`: judged relevant; includes chunks, `top_score`, `scores`, and
+  `judged: true`.
+- `no_relevant_content`: judged irrelevant; includes the reason, `top_score`,
+  `scores`, and `judged: true`, without answer passages.
+- `unavailable`: retrieval failed or no matching passages were returned;
+  `judged: false`.
+- `judgement_unavailable`: retrieval succeeded but the judge failed or returned
+  invalid output; includes scores and `judged: false`. No answer is synthesized.
+
+When a grade is supplied, matching passages may have that grade or no grade tag.
+Ingestion represents null grades by omitting the metadata key, so Pinecone uses
+`grade == requested OR grade does not exist`. Other grades remain excluded.
+
+Enable INFO logging for `api.services.guidance` to collect score/judgement rows:
+
+```python
+import logging
+from api.services.guidance import search
+
+logging.basicConfig(level=logging.INFO)
+r = search('How is mathematics taught?', 'CA-CCSSM-2013')
+print(r['state'], r.get('top_score'), r.get('scores'), r['judged'])
+```
+
+Each search logs the question, framework, top score, and judgement. Retrieval
+failures/empty results log `NOT_JUDGED`; judge failures log `ERROR`. These logs
+include question text, so use anonymized questions when sharing a report.
