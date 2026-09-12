@@ -454,18 +454,50 @@ def _show_passage(chunk):
         st.markdown(f"[Open source document]({url})")
 
 
+_SUBJECT_LEARNING = {
+    "math": "mathematics, including numbers, shapes and measurement",
+    "ela": "reading, writing, speaking and listening",
+    "eld": "using and understanding English",
+    "sci": "science and engineering",
+    "hss": "history and social science",
+    "vapa": "music, art, dance, theatre and media arts",
+    "pe": "movement skills, fitness and physical activity",
+}
+_REFUSAL_STATES = {"no_relevant_content", "unanswerable"}
+
+
+def _refusal_redirect(subject, reason=None):
+    # Keep the retrieval refusal intact; the offer is separate, never a partial answer.
+    refusal = (reason or "The available California framework passages do not answer this question.").strip()
+    if refusal[-1:] not in {".", "!", "?"}:
+        refusal += "."
+    learning = _SUBJECT_LEARNING.get(subject)
+    offer = (f"They do set out what children learn in {learning} at each grade — "
+             "you can see that in Guided setup." if learning else
+             "You can use Guided setup to choose a subject and grade and see what children learn.")
+    return refusal + " " + offer
+
+
+def _show_refusal(result, reason=None):
+    subject = _open_intent(result).get("subject")
+    st.info(_refusal_redirect(subject, reason), icon="ℹ️")
+    st.button("Explore this subject with Guided setup" if subject in _SUBJECT_LEARNING else
+              "Explore learning with Guided setup", type="tertiary", on_click=_full_guide)
+
+
 def open_results_screen(result):
     intent = _open_intent(result)
     question = " ".join(intent.get("raw", "").split())
     question = question[:1].upper() + question[1:]
     st.subheader(question or "Explore the curriculum")
     retrieval = result.get("tool_results", {}).get("guidance", {})
-    status = retrieval.get("state")
+    status = retrieval.get("state") or result.get("state")
     chunks = retrieval.get("chunks", [])
-    if status == "no_relevant_content":
-        st.info(retrieval["reason"], icon="ℹ️")
+    if status in _REFUSAL_STATES:
+        _show_refusal(result, retrieval.get("reason") or result.get("reason"))
     elif status in {"unavailable", "judgement_unavailable"} or result.get("explanation_error"):
         st.error(retrieval.get("reason") or result["answer"])
+        return
     elif not result.get("subject"):
         st.info("Which subject did you have in mind?")
     elif result.get("open_paragraphs"):
@@ -496,15 +528,14 @@ def open_results_screen(result):
                 st.selectbox(field.title(), options, index=None, key=key,
                     format_func=SUBJECT_LABELS.get if field == "subject" else grade_label,
                     on_change=_open_change, args=(field,))
-    if status == "no_relevant_content":
-        followup = "Explore this subject with Guided setup"
-    elif result.get("grade") is not None and result.get("subject"):
+    if result.get("grade") is not None and result.get("subject"):
         year = {0: "kindergarteners", 1: "first graders", 2: "second graders", 3: "third graders", 4: "fourth graders", 5: "fifth graders"}.get(result["grade"], "children")
         followup = f"Want to see what {year} actually learn in {SUBJECT_LABELS[result['subject']].lower()}? See the full guide"
     else:
         followup = "Want to explore learning by grade? See the full guide"
-    st.button(followup, type="tertiary", on_click=_full_guide)
-    if chunks:
+    if status not in _REFUSAL_STATES:
+        st.button(followup, type="tertiary", on_click=_full_guide)
+    if chunks and status not in _REFUSAL_STATES:
         titles = list(dict.fromkeys(c.get("metadata", {}).get("document_title") or "Curriculum framework" for c in chunks))
         with st.expander(f"Based on {len(chunks)} passages from {', '.join(titles)}", expanded=False):
             for chunk in chunks:
@@ -530,6 +561,9 @@ def _activity_trace(result):
 
 def results_screen() -> None:
     result = st.session_state.results
+    if result.get("state") in _REFUSAL_STATES:
+        _show_refusal(result, result.get("reason"))
+        return
     if result.get("question_type") == "open":
         open_results_screen(result)
         return

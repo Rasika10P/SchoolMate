@@ -644,7 +644,7 @@ def test_open_nonanswer_states_never_show_synthesis(monkeypatch, status, kind):
     page.session_state.results = open_result(status)
     page.run()
     assert not page.exception
-    assert 'No passages answer this question.' in [e.value for e in getattr(page, kind)]
+    assert any(e.value.startswith('No passages answer this question.') for e in getattr(page, kind))
     assert 'Children explore mathematical ideas.' not in [m.value for m in page.markdown]
     if status == 'no_relevant_content':
         assert not page.error
@@ -795,3 +795,53 @@ def test_source_status_uses_live_database_and_namespace_counts(monkeypatch):
     assert snapshot['tables']['standard'] == 30
     assert [f['Framework'] for f in snapshot['frameworks']] == ['CA-CCSSM-2013']
     index.describe_index_stats.assert_called_once()
+
+
+@pytest.mark.parametrize('status', ['no_relevant_content', 'unanswerable'])
+@pytest.mark.parametrize('subject', ['math', 'ela', 'eld', 'sci', 'hss', 'vapa', 'pe', None])
+def test_refusal_offers_actual_subject_without_generation(monkeypatch, status, subject):
+    forbidden = MagicMock(side_effect=AssertionError('No render calls'))
+    monkeypatch.setattr(llm, 'cached_complete', forbidden)
+    page = new_page()
+    result = open_result(status)
+    result['subject'] = subject
+    result['intent'] = {'subject': subject, 'grade': None, 'raw': 'An unsupported question'}
+    page.session_state.stage = 'results'
+    page.session_state.results = result
+    page.run()
+    assert not page.exception
+    message = page.info[0].value
+    assert message.startswith('No passages answer this question.')
+    assert 'Guided setup' in message
+    if subject:
+        assert app._SUBJECT_LEARNING[subject] in message
+    else:
+        assert 'choose a subject and grade' in message
+    buttons = [b for b in page.button if 'Explore' in b.label and 'Guided setup' in b.label]
+    assert len(buttons) == 1
+    assert not any(m.value == 'Children explore mathematical ideas.' for m in page.markdown)
+    buttons[0].click().run()
+    assert page.session_state.stage == 'entry'
+    assert page.selectbox(key='guide_subject').value == subject
+    forbidden.assert_not_called()
+
+
+def test_explicit_unanswerable_state_redirects_without_structured_tabs():
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = dict(state='unanswerable', subject='vapa', grade=None,
+        reason="The California framework documents don't discuss college admissions.")
+    page.run()
+    assert not page.exception
+    assert 'music, art, dance, theatre and media arts' in page.info[0].value
+    assert not any(t.label == 'Learning this year' for t in page.tabs)
+
+
+@pytest.mark.parametrize('status', ['unavailable', 'judgement_unavailable'])
+def test_fault_does_not_offer_curriculum_alternative(status):
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = open_result(status)
+    page.run()
+    assert page.error and not page.exception
+    assert not any('Explore' in b.label or 'See the full guide' in b.label for b in page.button)
