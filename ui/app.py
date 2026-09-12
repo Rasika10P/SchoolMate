@@ -83,8 +83,9 @@ def _hydrate(subject: str, grade: int, domain: str | None) -> dict[str, Any]:
 
 
 @st.cache_data(show_spinner=False)
-def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode: str) -> dict[str, Any]:
-    """Five-key cache: identical submissions do not repeat graph or database work."""
+def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode: str,
+                   question: str | None = None) -> dict[str, Any]:
+    """Cache by guide choices and original question; reruns never repeat the graph."""
     # Preparation needs curriculum context as well as the independent catalogue.
     preparation_error = None
     if goal == "competition_prep":
@@ -103,6 +104,7 @@ def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode
                 "subject": subject, "grade": grade, "domain": domain, "goal": goal, "mode": mode}
     graph = build_deterministic_graph() if mode == "deterministic" else build_agent_graph()
     state = GuideState(subject=subject, grade=grade, domain=domain, goal=goal,
+                       question=question, question_type="structured",
                        tool_results={}, answer="", messages=[])
     result = graph.invoke(state)
     return {"content": content, "preparation_error": preparation_error,
@@ -267,13 +269,17 @@ def _submit_question(intent: dict[str, Any], *, rerun: bool = True,
               "tool_results": {}, "content": None}
     if subject is not None and (is_open or grade is not None):
         before, started = _usage_snapshot(), perf_counter()
-        mode = "agent" if is_open else st.session_state.mode
+        mode = "agent"  # Free-text requests delegate tool choice to the agent.
         try:
             with st.spinner("Preparing your answer…"):
                 if is_open:
                     result.update(generate_open_answer(intent["raw"], subject, grade))
                 else:
-                    result.update(generate_guide(subject, grade, None, intent["goal"], mode))
+                    if mode == "agent":
+                        result.update(generate_guide(subject, grade, None, intent["goal"], mode,
+                                                     question=intent["raw"]))
+                    else:
+                        result.update(generate_guide(subject, grade, None, intent["goal"], mode))
                     content = result.get("content") or {}
                     if content.get("standards"):
                         try:
@@ -797,9 +803,10 @@ def how_this_works_screen() -> None:
     st.write("The fixed flow cannot reach search_guidance: no goal maps to it. "
              "Open questions are answerable only on the agent path.")
     st.session_state.setdefault("_mode_choice", st.session_state.mode)
-    st.radio("Guide mode", ["deterministic", "agent"], key="_mode_choice", on_change=_select_mode,
+    st.radio("Guided setup mode", ["deterministic", "agent"], key="_mode_choice", on_change=_select_mode,
              format_func=lambda value: "Fixed flow" if value == "deterministic" else "Agent")
-    st.caption("Applies to your next structured guide. Open questions always use the agent.")
+    st.caption("This selector applies only to Guided setup. Ask me anything always uses the agent, "
+               "which can choose a curriculum lookup or framework guidance.")
 
     st.subheader("Where the answers come from")
     st.button("Refresh source status", on_click=_refresh_sources)

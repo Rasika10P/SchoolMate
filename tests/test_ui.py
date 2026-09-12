@@ -913,6 +913,9 @@ def test_ask_preparation_generates_parent_help_once_and_displays_it(monkeypatch)
     from api.graph import extractor
     from api.services import parent_help
     app.generate_guide.clear()
+    graph = MagicMock()
+    graph.invoke.return_value = {'answer': 'Agent result', 'tool_results': {}}
+    monkeypatch.setattr(agentic, 'build_agent_graph', lambda: graph)
     payload = content()
     payload['standards'] = [record('2.OA.1', 2)]
     from api.services import standards, progression
@@ -969,3 +972,54 @@ def test_subjectless_question_clears_previous_math_answer_and_calls_no_tools(mon
     assert not any('Previous mathematics answer' in m.value for m in page.markdown)
     model.assert_called_once()
     forbidden.assert_not_called()
+
+
+def test_agent_receives_original_question_and_cache_distinguishes_questions(monkeypatch):
+    app.generate_guide.clear()
+    monkeypatch.setattr(app, '_hydrate', lambda *args: content())
+    graph = MagicMock()
+    graph.invoke.return_value = {'answer': 'Agent answer', 'tool_results': {}}
+    monkeypatch.setattr(app, 'build_agent_graph', lambda: graph)
+    for question in ['Where can I register?', 'Where can I register?', 'Where are study materials?']:
+        app.generate_guide('math', 2, None, 'competition_prep', 'agent', question=question)
+    assert graph.invoke.call_count == 2
+    assert graph.invoke.call_args_list[0].args[0]['question'] == 'Where can I register?'
+    assert graph.invoke.call_args_list[1].args[0]['question'] == 'Where are study materials?'
+    app.generate_guide.clear()
+
+
+def test_ask_uses_agent_even_with_fixed_setup_and_populates_agent_card(monkeypatch):
+    from api.graph import extractor
+    app.generate_guide.clear()
+    conn = MagicMock()
+    conn.__enter__.return_value = conn
+    conn.cursor.return_value.__enter__.return_value.fetchone.return_value = ('source', 'test')
+    monkeypatch.setattr(db, 'get_conn', lambda: conn)
+    from api.services import standards
+    monkeypatch.setattr(standards, 'get_standards', lambda *args: [])
+    monkeypatch.setattr(standards, 'get_achievement_levels', lambda *args: [])
+    graph = MagicMock()
+    graph.invoke.return_value = {'answer': 'Agent result', 'tool_results': {}}
+    monkeypatch.setattr(agentic, 'build_agent_graph', lambda: graph)
+    fixed = MagicMock(side_effect=AssertionError('Must not use fixed flow'))
+    monkeypatch.setattr(deterministic, 'build_deterministic_graph', fixed)
+    monkeypatch.setattr(extractor, 'extract_intent', lambda q: dict(subject='math', grade=2,
+        question_type='structured', goal='competition_prep', raw=q, evidence={}))
+    page = new_page().run()
+    navigate(page, 'About')
+    assert page.radio(key='_mode_choice').value == 'deterministic'
+    navigate(page, 'Guide')
+    question = 'Where can I register for Math Kangaroo for grade 2?'
+    page.text_area[0].set_value(question)
+    next(b for b in page.button if b.label == 'Ask').click().run()
+    assert not page.exception
+    assert page.session_state.results['mode'] == 'agent'
+    assert 'agent' in page.session_state.mode_stats
+    assert 'deterministic' not in page.session_state.mode_stats
+    graph.invoke.assert_called_once()
+    assert graph.invoke.call_args.args[0]['question'] == question
+    navigate(page, 'About')
+    assert [m.value for m in page.metric][:3] == ['—', '—', '—']
+    assert page.metric[3].value == '0'  # Mocked graph makes no provider calls.
+    fixed.assert_not_called()
+    app.generate_guide.clear()
