@@ -800,29 +800,11 @@ def how_this_works_screen() -> None:
     st.info("Placeholder: the four-configuration comparison table will appear here when evaluation is complete.")
 
     with st.expander("Architecture", expanded=False):
-        st.graphviz_chart("""digraph SchoolMate {
-            graph [rankdir=TB, bgcolor="transparent", pad="0.2", nodesep="0.4"];
-            node [shape=box, style="rounded,filled", fillcolor="#eef4ff", color="#8196b4", fontname="Arial", fontsize=16];
-            edge [color="#60748d", fontname="Arial", fontsize=12];
-            ui [label="SchoolMate · Streamlit\\nGuided setup + Ask me anything"];
-            intent [label="Question classification\\nSubject, grade and question type"];
-            sqlroute [label="Structured requests\\nFixed flow or tool-calling agent"];
-            proseroute [label="Open questions\\nFramework search + agent response"];
-            db [label="Postgres\\nStandards, progressions and achievement levels"];
-            pine [label="Pinecone\\nFramework prose by subject namespace"];
-            offline [label="Offline preparation\\nCSV loading, prose ingestion, translations and overviews"];
-            cache [label="Cached results\\nAnswers, learning areas and sources"];
-            ui -> sqlroute [label="guided choices"];
-            ui -> intent [label="question"];
-            intent -> sqlroute [label="what / next / revisit"];
-            intent -> proseroute [label="how / why"];
-            sqlroute -> db;
-            proseroute -> pine;
-            offline -> db;
-            offline -> pine;
-            db -> cache;
-            pine -> cache;
-        }""", width="stretch")
+        st.image(
+            str(ROOT / "ui" / "assets" / "curriculum_guide_flowchart_with_neon.png"),
+            caption="SchoolMate architecture: document preparation, question routing, evidence checks and answers.",
+            width="stretch",
+        )
 
     with st.expander("Diagnostics", expanded=False):
         st.caption("Process-wide usage totals across sessions; these are separate from the per-run cards.")

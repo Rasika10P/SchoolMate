@@ -485,7 +485,7 @@ def test_about_project_and_architecture_need_no_io(monkeypatch):
     navigate(page, "About")
     assert not page.exception
     assert any("SchoolMate helps families" in m.value for m in page.markdown)
-    assert len(page.get("graphviz_chart")) == 1
+    assert len(page.image) == 1
     navigate(page, "Guide")
     assert not page.exception
     assert not page.metric and not page.code
