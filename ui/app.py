@@ -481,8 +481,41 @@ def _refusal_redirect(subject, reason=None):
 def _show_refusal(result, reason=None):
     subject = _open_intent(result).get("subject")
     st.info(_refusal_redirect(subject, reason), icon="ℹ️")
-    st.button("Explore this subject with Guided setup" if subject in _SUBJECT_LEARNING else
-              "Explore learning with Guided setup", type="tertiary", on_click=_full_guide)
+
+
+def _change_extracted_field(field, value):
+    with st.popover("Change"):
+        options = list(SUBJECT_LABELS) if field == "subject" else list(range(6))
+        key = f"open_{field}"
+        st.session_state.setdefault(key, value)
+        st.selectbox(field.title(), options, index=None, key=key,
+            format_func=SUBJECT_LABELS.get if field == "subject" else grade_label,
+            on_change=_open_change, args=(field,))
+
+
+def _understood_fields(intent):
+    fields = []
+    if intent.get("subject") in SUBJECT_LABELS:
+        fields.append("subject")
+    if type(intent.get("grade")) is int and 0 <= intent["grade"] <= 5:
+        fields.append("grade")
+    if not fields:
+        return
+    if len(fields) > 1:
+        st.caption("What I understood")
+    for field in fields:
+        value = intent[field]
+        label = SUBJECT_LABELS[value] if field == "subject" else grade_label(value)
+        if len(fields) == 1:
+            content, action = st.columns([6, 1])
+            content.write(f"Answering about {label.lower()}.")
+        else:
+            name, content, evidence, action = st.columns([1, 2, 3, 1])
+            name.write(field.title())
+            content.write(label)
+            evidence.write(intent.get("evidence", {}).get(field) or "From your question")
+        with action:
+            _change_extracted_field(field, value)
 
 
 def open_results_screen(result):
@@ -495,11 +528,13 @@ def open_results_screen(result):
     chunks = retrieval.get("chunks", [])
     if status in _REFUSAL_STATES:
         _show_refusal(result, retrieval.get("reason") or result.get("reason"))
+        return
     elif status in {"unavailable", "judgement_unavailable"} or result.get("explanation_error"):
         st.error(retrieval.get("reason") or result["answer"])
         return
-    elif not result.get("subject"):
+    elif status == "need_subject" or not result.get("subject"):
         st.info("Which subject did you have in mind?")
+        return
     elif result.get("open_paragraphs"):
         by_id = {chunk["id"]: chunk for chunk in chunks}
         for paragraph in result["open_paragraphs"]:
@@ -511,23 +546,10 @@ def open_results_screen(result):
         # Older saved sessions remain readable; no synthesis on rerun.
         st.write(result["answer"])
 
-    st.caption("What I understood")
-    fields = ["subject"] + (["grade"] if intent.get("grade") is not None else [])
-    for field in fields:
-        value = intent.get(field)
-        label = SUBJECT_LABELS.get(value, "Not mentioned") if field == "subject" else grade_label(value)
-        name, content, evidence, action = st.columns([1, 2, 3, 1])
-        name.write(field.title())
-        content.write(label)
-        evidence.write(intent.get("evidence", {}).get(field) or ("Not mentioned" if value is None else "From your question"))
-        with action:
-            with st.popover("Change" if value is not None else "Add"):
-                options = list(SUBJECT_LABELS) if field == "subject" else list(range(6))
-                key = f"open_{field}"
-                st.session_state.setdefault(key, value)
-                st.selectbox(field.title(), options, index=None, key=key,
-                    format_func=SUBJECT_LABELS.get if field == "subject" else grade_label,
-                    on_change=_open_change, args=(field,))
+    else:
+        return
+
+    _understood_fields(intent)
     if result.get("grade") is not None and result.get("subject"):
         year = {0: "kindergarteners", 1: "first graders", 2: "second graders", 3: "third graders", 4: "fourth graders", 5: "fifth graders"}.get(result["grade"], "children")
         followup = f"Want to see what {year} actually learn in {SUBJECT_LABELS[result['subject']].lower()}? See the full guide"

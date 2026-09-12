@@ -648,7 +648,7 @@ def test_open_nonanswer_states_never_show_synthesis(monkeypatch, status, kind):
     assert 'Children explore mathematical ideas.' not in [m.value for m in page.markdown]
     if status == 'no_relevant_content':
         assert not page.error
-        assert any('Guided setup' in b.label for b in page.button)
+        assert 'Guided setup' in page.info[0].value
     forbidden.assert_not_called()
 
 
@@ -818,11 +818,9 @@ def test_refusal_offers_actual_subject_without_generation(monkeypatch, status, s
     else:
         assert 'choose a subject and grade' in message
     buttons = [b for b in page.button if 'Explore' in b.label and 'Guided setup' in b.label]
-    assert len(buttons) == 1
+    assert not buttons
+    assert not page.get('popover')
     assert not any(m.value == 'Children explore mathematical ideas.' for m in page.markdown)
-    buttons[0].click().run()
-    assert page.session_state.stage == 'entry'
-    assert page.selectbox(key='guide_subject').value == subject
     forbidden.assert_not_called()
 
 
@@ -845,3 +843,42 @@ def test_fault_does_not_offer_curriculum_alternative(status):
     page.run()
     assert page.error and not page.exception
     assert not any('Explore' in b.label or 'See the full guide' in b.label for b in page.button)
+
+
+@pytest.mark.parametrize('status', ['no_relevant_content', 'unavailable', 'need_subject', 'unanswerable'])
+def test_nonanswers_hide_understood_fields(status):
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = open_result(status)
+    page.run()
+    assert not page.exception
+    assert not page.get('popover')
+    assert not any(m.value == 'What I understood' for m in page.caption)
+    assert not any('Answering about' in m.value for m in page.markdown)
+
+
+def test_single_extracted_field_is_one_line_with_working_change(monkeypatch):
+    app.generate_open_answer.clear()
+    graph = MagicMock()
+    graph.invoke.return_value = {'answer': 'New saved answer', 'tool_results': {}}
+    monkeypatch.setattr(agentic, 'build_agent_graph', lambda: graph)
+    generate = graph.invoke
+    page = new_page()
+    result = open_result()
+    result['subject'] = 'vapa'
+    result['grade'] = None
+    result['intent'] = {'subject': 'vapa', 'grade': None, 'raw': 'How are arts taught?',
+                        'question_type': 'open', 'evidence': {'subject': 'arts'}}
+    page.session_state.stage = 'results'
+    page.session_state.results = result
+    page.run()
+    assert not page.exception
+    assert 'Answering about visual and performing arts.' in [m.value for m in page.markdown]
+    assert not any(m.value == 'What I understood' for m in page.caption)
+    assert len(page.get('popover')) == 1
+    generate.assert_not_called()
+    page.selectbox(key='open_subject').set_value('math').run()
+    assert not page.exception
+    generate.assert_called_once()
+    intent = generate.call_args.args[0]
+    assert (intent['question'], intent['subject'], intent['grade']) == ('How are arts taught?', 'math', None)
