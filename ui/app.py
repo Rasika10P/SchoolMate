@@ -84,8 +84,17 @@ def _hydrate(subject: str, grade: int, domain: str | None) -> dict[str, Any]:
 @st.cache_data(show_spinner=False)
 def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode: str) -> dict[str, Any]:
     """Five-key cache: identical submissions do not repeat graph or database work."""
-    # Programme recommendations come from the catalogue, not Postgres.
-    content = None if goal == "competition_prep" else _hydrate(subject, grade, domain)
+    # Preparation needs curriculum context as well as the independent catalogue.
+    preparation_error = None
+    if goal == "competition_prep":
+        try:
+            content = _hydrate(subject, grade, domain)
+        except (psycopg.Error, RuntimeError):
+            logger.exception("Preparation curriculum could not be loaded")
+            content = None
+            preparation_error = "The programme list is available, but we couldn’t load the grade-level practice ideas. Please try again shortly."
+    else:
+        content = _hydrate(subject, grade, domain)
     tab = "standing" if goal == "on_grade_level" else "next_steps"
     if goal != "competition_prep" and supports(subject, tab, grade) and content.get("data_state") == "not_loaded":
         return {"content": content, "answer": content["data_reason"], "activity_trace": [],
@@ -95,7 +104,8 @@ def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode
     state = GuideState(subject=subject, grade=grade, domain=domain, goal=goal,
                        tool_results={}, answer="", messages=[])
     result = graph.invoke(state)
-    return {"content": content, "answer": result["answer"], "tool_results": result["tool_results"],
+    return {"content": content, "preparation_error": preparation_error,
+            "answer": result["answer"], "tool_results": result["tool_results"],
             "activity_trace": result.get("activity_trace", []),
             "subject": subject, "grade": grade, "domain": domain, "goal": goal, "mode": mode}
 
@@ -591,6 +601,8 @@ def results_screen() -> None:
         return
     if result.get("content") is None:
         st.divider()
+        if result.get("preparation_error"):
+            st.warning(result["preparation_error"])
         if result.get("answer"):
             st.write(result["answer"])
         elif not result.get("subject"):
@@ -601,6 +613,10 @@ def results_screen() -> None:
     content = result["content"]
     subject, grade = result["subject"], result["grade"]
     st.subheader(f"{SUBJECT_LABELS[subject]} · {grade_label(grade)}")
+    if result.get("goal") == "competition_prep":
+        st.write("Start with the learning areas below, try the everyday examples together, "
+                 "and use Outside programmes to explore competitions. These are grade-level curriculum "
+                 "skills, not an official contest syllabus.")
     if content.get("data_state") == "not_loaded":
         st.info(content["data_reason"])
     if st.button("Refresh guide text"):
@@ -671,7 +687,13 @@ def results_screen() -> None:
                                  f" — Pages {min(pages)}–{max(pages)}") if pages else ""
                     st.markdown(f"[California {SUBJECT_LABELS[subject].lower()} achievement descriptions]({url}){page_note}")
             elif key == "activities":
-                st.info("Sourced activities have not been added to this guide yet.")
+                examples = [row for row in content["standards"] if (row.get("plain_example") or "").strip()]
+                if examples:
+                    st.write("Try these everyday examples together. Ask your child to explain how they worked it out.")
+                    _domain_sections(examples, grade, {})
+                else:
+                    st.info("Everyday practice examples have not been added for this grade yet. "
+                            "Learning this year shows the available curriculum skills.")
             elif key == "programs":
                 if programs["state"] == "not_published":
                     st.info(programs["reason"])

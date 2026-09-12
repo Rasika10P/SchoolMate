@@ -192,14 +192,14 @@ def test_parent_rows_official_expanders_next_grade_and_sources(monkeypatch):
     page.run()
     assert not page.exception
     expanders = [e for e in page.expander if e.label == 'See the official wording']
-    assert len(expanders) == 2
+    assert len(expanders) == 3
     assert all('Exact official text.' in [m.value for m in e.markdown] for e in expanders)
     assert 'K.CC.1' in expanders[0].text[0].value
     assert '1.CC.1' in expanders[1].text[0].value
     assert not any('CC.1' in m.value for m in page.markdown)
     values = [m.value for m in page.markdown]
     assert '**What your child learns**' not in values
-    assert values.count('**Everyday example**') == 2
+    assert values.count('**Everyday example**') == 3
     assert 'Once these are comfortable, children usually move on to:' in values
     assert sum('(https://example.org/document.pdf) — Pages 2–5' in v for v in values) == 1
     assert not any('Source document:' in c.value for c in page.caption)
@@ -495,12 +495,13 @@ def test_about_project_and_architecture_need_no_io(monkeypatch):
 
 def test_outside_programmes_work_without_database(monkeypatch):
     app.generate_guide.clear()
-    forbidden = MagicMock(side_effect=AssertionError("Programme catalogue needs no database"))
-    monkeypatch.setattr(app, "_hydrate", forbidden)
+    unavailable_db = MagicMock(side_effect=RuntimeError("DATABASE_URL must be set"))
+    monkeypatch.setattr(app, "_hydrate", unavailable_db)
     result = app.generate_guide("math", 2, None, "competition_prep", "deterministic")
     assert "Math Kangaroo" in result["answer"]
     assert result["content"] is None
-    forbidden.assert_not_called()
+    assert result["preparation_error"]
+    unavailable_db.assert_called_once()
     unavailable = app.generate_guide("hss", 2, None, "competition_prep", "deterministic")
     assert unavailable["tool_results"]["state"] == "not_published"
     assert unavailable["answer"] == NOT_PUBLISHED_REASON["hss", "programs"]
@@ -882,3 +883,27 @@ def test_single_extracted_field_is_one_line_with_working_change(monkeypatch):
     generate.assert_called_once()
     intent = generate.call_args.args[0]
     assert (intent['question'], intent['subject'], intent['grade']) == ('How are arts taught?', 'math', None)
+
+
+def test_competition_preparation_loads_skills_and_saved_examples(monkeypatch):
+    app.generate_guide.clear()
+    payload = content()
+    payload['standards'] = [record('2.OA.1', 2)]
+    hydrate = MagicMock(return_value=payload)
+    monkeypatch.setattr(app, '_hydrate', hydrate)
+    result = app.generate_guide('math', 2, None, 'competition_prep', 'deterministic')
+    assert result['content'] == payload
+    assert result['preparation_error'] is None
+    assert len(result['activity_trace']) == 1
+    assert result['activity_trace'][0]['tool'] == 'competition_prep'
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = result
+    page.run()
+    assert not page.exception
+    assert any(t.label == 'Learning this year' for t in page.tabs)
+    activities = next(t for t in page.tabs if t.label == 'Activities')
+    assert any('Everyday example' in m.value for m in activities.markdown)
+    page.run()
+    hydrate.assert_called_once()
+    app.generate_guide.clear()
