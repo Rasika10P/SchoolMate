@@ -24,7 +24,7 @@ def test_extraction(monkeypatch: pytest.MonkeyPatch, content: str, expected: dic
     monkeypatch.delenv("EXTRACTOR_MODEL", raising=False)
     model = Mock(return_value={"choices": [{"message": {"content": content}}]})
     monkeypatch.setattr(llm, "cached_complete", model)
-    question = "  My child needs help.\n"
+    question = "  My child needs help with math and English fractions.\n"
     assert extract_intent(question) == {**expected, "raw": question, "evidence": {},
                                          "question_type": "structured" if expected["goal"] else "open"}
     assert model.call_args.kwargs["model"] == "openai/gpt-4o-mini"
@@ -54,3 +54,28 @@ def test_open_and_uncertain_intents_discard_goal_and_keep_evidence(monkeypatch, 
     assert intent["question_type"] == "open"
     assert intent["goal"] is None
     assert intent["evidence"] == {"subject": "from 'fractions'", "grade": "most 9-year-olds"}
+
+
+@pytest.mark.parametrize('question', [
+    'tell me how i should prepmy 2 nd grader for competition exams',
+    'Help my child prepare for exams', 'What should a second grader learn?',
+    'My child is behind', 'How can we practise at home?'])
+def test_invented_math_subject_is_rejected_even_with_model_evidence(monkeypatch, question):
+    payload = dict(subject='math', grade=2, goal='competition_prep', question_type='structured',
+                   domain='arithmetic', evidence={'subject': 'competition exams mean maths'})
+    monkeypatch.setattr(llm, 'cached_complete', Mock(return_value={
+        'choices': [{'message': {'content': json.dumps(payload)}}]}))
+    intent = extract_intent(question)
+    assert intent['subject'] is None and intent['domain'] is None
+    assert not intent['evidence'].get('subject')
+    assert intent['grade'] == 2 and intent['goal'] == 'competition_prep'
+
+
+@pytest.mark.parametrize('subject,question', [
+    ('math', 'Help with fractions'), ('ela', 'Help with writting'),
+    ('sci', 'How can we study sceince?'), ('hss', 'Help with history'),
+    ('vapa', 'Prepare for music competitions'), ('pe', 'What physical education covers'),
+    ('eld', 'My child receives English language support')])
+def test_subject_cues_cover_each_subject(subject, question):
+    from api.graph.extractor import subject_is_grounded
+    assert subject_is_grounded(subject, question)

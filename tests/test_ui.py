@@ -942,3 +942,30 @@ def test_ask_preparation_generates_parent_help_once_and_displays_it(monkeypatch)
     navigate(page, 'Guide')
     help_mock.assert_called_once()
     app.generate_guide.clear()
+
+
+def test_subjectless_question_clears_previous_math_answer_and_calls_no_tools(monkeypatch):
+    import json
+    from api.services import parent_help
+    model = MagicMock(return_value={'choices': [{'message': {'content': json.dumps(dict(
+        subject='math', grade=2, goal='competition_prep', question_type='structured',
+        evidence={'subject': 'Assumed maths from exams'}))}}]})
+    monkeypatch.setattr(llm, 'cached_complete', model)
+    forbidden = MagicMock(side_effect=AssertionError('Missing subject must not load or generate a guide'))
+    monkeypatch.setattr(db, 'get_conn', forbidden)
+    monkeypatch.setattr(parent_help, 'generate_parent_help', forbidden)
+    monkeypatch.setattr(agentic, 'build_agent_graph', forbidden)
+    monkeypatch.setattr(deterministic, 'build_deterministic_graph', forbidden)
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = dict(content=None, answer='Previous mathematics answer', subject='math', grade=2)
+    page.run()
+    page.text_area[0].set_value('tell me how i should prepmy 2 nd grader for competition exams')
+    next(b for b in page.button if b.label == 'Ask').click().run()
+    assert not page.exception
+    assert page.session_state.results['subject'] is None
+    assert page.session_state.results['grade'] == 2
+    assert 'Which subject did you have in mind?' in [i.value for i in page.info]
+    assert not any('Previous mathematics answer' in m.value for m in page.markdown)
+    model.assert_called_once()
+    forbidden.assert_not_called()
