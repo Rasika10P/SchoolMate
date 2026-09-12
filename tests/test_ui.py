@@ -907,3 +907,38 @@ def test_competition_preparation_loads_skills_and_saved_examples(monkeypatch):
     page.run()
     hydrate.assert_called_once()
     app.generate_guide.clear()
+
+
+def test_ask_preparation_generates_parent_help_once_and_displays_it(monkeypatch):
+    from api.graph import extractor
+    from api.services import parent_help
+    app.generate_guide.clear()
+    payload = content()
+    payload['standards'] = [record('2.OA.1', 2)]
+    from api.services import standards, progression
+    from api.models import Standard
+    conn = MagicMock()
+    conn.__enter__.return_value = conn
+    conn.cursor.return_value.__enter__.return_value.fetchone.return_value = ('source', 'test')
+    monkeypatch.setattr(db, 'get_conn', lambda: conn)
+    monkeypatch.setattr(standards, 'get_standards', lambda *args: [Standard(**payload['standards'][0])])
+    monkeypatch.setattr(standards, 'get_achievement_levels', lambda *args: [])
+    monkeypatch.setattr(progression, 'walk', lambda *args: [])
+    question = 'tell me how i should pepare 2 nd grader for competition exams math'
+    monkeypatch.setattr(extractor, 'extract_intent', lambda q: dict(subject='math', grade=2,
+        goal='competition_prep', question_type='structured', raw=q, evidence={}))
+    help_mock = MagicMock(return_value=dict(explanation='Practise adding and subtracting with everyday problems.',
+        sources=payload['standards'], suggestions=['Count spoons together.', 'Try two ways.', 'Explain a solution.']))
+    monkeypatch.setattr(parent_help, 'generate_parent_help', help_mock)
+    page = new_page().run()
+    page.text_area[0].set_value(question)
+    next(b for b in page.button if b.label == 'Ask').click().run()
+    assert not page.exception
+    assert 'Practise adding and subtracting with everyday problems.' in [m.value for m in page.markdown]
+    assert any('General practice suggestions' in c.value for c in page.caption)
+    help_mock.assert_called_once()
+    page.run()
+    navigate(page, 'About')
+    navigate(page, 'Guide')
+    help_mock.assert_called_once()
+    app.generate_guide.clear()

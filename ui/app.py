@@ -29,6 +29,7 @@ from api.graph.state import GuideState
 from api.graph.trace import describe_event, source_urls
 from api.services.progression import walk
 from api.services.overviews import get_overviews
+from api.services.parent_help import generate_parent_help
 from api.services.standards import get_achievement_levels, get_standards
 from api.tools.definitions import FRAMEWORK_BY_SUBJECT, competition_prep
 
@@ -273,6 +274,14 @@ def _submit_question(intent: dict[str, Any], *, rerun: bool = True,
                     result.update(generate_open_answer(intent["raw"], subject, grade))
                 else:
                     result.update(generate_guide(subject, grade, None, intent["goal"], mode))
+                    content = result.get("content") or {}
+                    if content.get("standards"):
+                        try:
+                            result["parent_help"] = generate_parent_help(
+                                intent["raw"], subject, grade, content["standards"])
+                        except Exception:
+                            logger.exception("Parent explanation failed; keeping the loaded guide")
+                            result["parent_help_error"] = True
         except Exception as exc:
             _show_failure(exc)
             result["answer"] = "We couldn’t prepare your answer. Please try again shortly."
@@ -613,7 +622,23 @@ def results_screen() -> None:
     content = result["content"]
     subject, grade = result["subject"], result["grade"]
     st.subheader(f"{SUBJECT_LABELS[subject]} · {grade_label(grade)}")
-    if result.get("goal") == "competition_prep":
+    if result.get("parent_help"):
+        help_text = result["parent_help"]
+        st.write("Standards describe the knowledge and skills California sets out for each grade.")
+        st.write(help_text["explanation"])
+        with st.expander("Standards behind this explanation", expanded=False):
+            for source in help_text["sources"]:
+                st.write(source["text"])
+                st.caption(source["code"])
+                if source.get("source_url"):
+                    st.markdown(f"[Read the official standard]({source['source_url']})")
+        st.markdown("**Ideas to try together**")
+        st.caption("General practice suggestions, not official California requirements or a contest syllabus.")
+        for idea in help_text["suggestions"]:
+            st.write("• " + idea)
+    elif result.get("parent_help_error"):
+        st.info("The standards are ready below, but the parent explanation couldn’t be prepared. Please submit again to retry.")
+    elif result.get("goal") == "competition_prep":
         st.write("Start with the learning areas below, try the everyday examples together, "
                  "and use Outside programmes to explore competitions. These are grade-level curriculum "
                  "skills, not an official contest syllabus.")

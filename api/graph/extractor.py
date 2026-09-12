@@ -19,6 +19,19 @@ goal: on_grade_level, working_ahead, catching_up, competition_prep, or null.
 question_type: "structured" for what a child learns, what comes next, what to
 revisit, or outside programmes; "open" for how or why a subject is taught,
 teaching approaches, or framework explanations. When unsure prefer "open".
+Classify the parent's intention, not the first word of the question. "How" does
+not automatically mean open. Practical help applying grade-level skills at home,
+preparing for competitions, or preparing for next year is structured.
+Competition/exam preparation and finding contests use goal competition_prep.
+Examples (tolerate spelling errors and spaces in grade numbers):
+"tell me how i should pepare 2 nd grader for competition exams math" =>
+subject math, grade 2, goal competition_prep, question_type structured.
+"how can I help my second grader practise maths at home" =>
+subject math, grade 2, goal on_grade_level, question_type structured.
+"how is math taught in first grade" =>
+subject math, grade 1, goal null, question_type open.
+"why are fractions taught before decimals" => subject math, grade null,
+goal null, question_type open.
 Open questions need subject only, grade is optional, and goal MUST be null.
 Structured questions use subject, grade and goal; leave an unclear goal null.
 evidence: an object with subject, grade, and goal keys containing brief reasons
