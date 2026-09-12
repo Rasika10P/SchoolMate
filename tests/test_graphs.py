@@ -111,3 +111,44 @@ def test_open_unavailable_does_not_invent_answer(monkeypatch, status):
     result = build_agent_graph().invoke({**state(), "question_type": "open", "question": "Why?", "grade": None, "goal": None})
     assert result["answer"] == "No prose yet."
     model.assert_not_called()
+
+
+
+@pytest.mark.parametrize("subject", [None, "general"])
+@pytest.mark.parametrize("question_type", ["open", "structured"])
+def test_missing_or_invented_subject_asks_only_subject(monkeypatch, subject, question_type):
+    forbidden = Mock(side_effect=AssertionError("No model or tool without a subject"))
+    monkeypatch.setattr(llm, "cached_complete", forbidden)
+    from api.services import guidance
+    monkeypatch.setattr(guidance, "search", forbidden)
+    result = build_agent_graph().invoke({"subject": subject, "grade": 4, "goal": None,
+        "question_type": question_type, "messages": [{"role": "user", "content":
+        "Here are the grades my child received in grade 4, tell me what areas I need to improve"}]})
+    assert result["state"] == "need_subject"
+    assert result["answer"] == "Which subject did you have in mind?"
+    assert result["tool_results"]["state"] == "need_subject"
+    forbidden.assert_not_called()
+
+
+def test_agent_invented_tool_subject_does_not_crash(monkeypatch):
+    reply = response(call_id="invalid")
+    reply["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = json.dumps({"subject": "general", "grade": 4})
+    model = Mock(return_value=reply)
+    monkeypatch.setattr(llm, "cached_complete", model)
+    result = build_agent_graph().invoke(state())
+    assert result["state"] == "need_subject"
+    assert result["answer"] == "Which subject did you have in mind?"
+    model.assert_called_once()
+
+
+def test_agent_prompt_prohibits_requesting_child_data(monkeypatch):
+    from api.graph.agentic import SYSTEM_PROMPT
+    for phrase in ("Never ask for a child's grades, test scores, report cards, teacher feedback",
+                   "any assessment of the child, in any circumstance",
+                   "without\nstoring or echoing it", "Do not assess the child",
+                   "Never invent a subject", "This system describes what California publishes"):
+        assert phrase in SYSTEM_PROMPT
+    model = Mock(return_value=response("Grade 4 covers these curriculum areas."))
+    monkeypatch.setattr(llm, "cached_complete", model)
+    build_agent_graph().invoke(state())
+    assert model.call_args.kwargs["messages"][0]["content"] == SYSTEM_PROMPT

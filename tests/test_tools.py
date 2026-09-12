@@ -67,11 +67,12 @@ def test_registration_and_model_visible_arguments() -> None:
 def test_unknown_subject_fails_before_database_access(monkeypatch: pytest.MonkeyPatch) -> None:
     database = MagicMock(side_effect=AssertionError("unexpected database access"))
     monkeypatch.setattr(tools, "get_conn", database)
+    monkeypatch.setattr(tools.guidance, "search", database)
     for item in tools.TOOLS:
-        with pytest.raises(ValueError, match="Unsupported subject"):
-            item.invoke({"subject": "unknown", "grade": 3, "question": "How?"})
-        with pytest.raises(ValueError, match="subject"):
-            item.invoke({"grade": 3, "question": "How?"})
+        for fields in ({"subject": "general"}, {"subject": None}, {}):
+            result = item.invoke({**fields, "grade": 3, "question": "How?"})
+            assert result["state"] == "need_subject"
+            assert all(name in result["reason"] for name in tools.SUBJECT_NAMES.values())
     database.assert_not_called()
 
 

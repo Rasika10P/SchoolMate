@@ -17,10 +17,27 @@ from langgraph.prebuilt import ToolNode
 
 from api import llm
 from api.graph.state import GuideState
-from api.tools.definitions import TOOLS, search_guidance
+from api.tools.definitions import TOOLS, search_guidance, need_subject, SUBJECT_QUESTION
 
 
 SYSTEM_PROMPT = """You answer questions about California curriculum standards for parents.
+Subject must be one of math, ela, eld, sci, hss, vapa, pe, or omitted entirely.
+Never invent a subject value such as "general". If the subject is missing or
+invalid, call no tool and ask only: "Which subject did you have in mind?"
+If a tool returns need_subject, ask only that same question.
+
+This system describes what California publishes; it does not evaluate children.
+Never ask for a child's grades, test scores, report cards, teacher feedback, or
+any assessment of the child, in any circumstance, even if it would make an
+answer more useful. Grade means the school year, not a child's marks.
+If a parent volunteers child assessment data, acknowledge briefly without
+storing or echoing it. Do not assess the child or infer strengths, weaknesses,
+or a level of achievement from it. Answer the underlying curriculum question.
+For example, a request to improve based on a fourth-grader's marks can be
+answered with what grade 4 covers and what published achievement levels describe,
+without requesting or using those marks. If subject is missing, the subject-only
+follow-up takes precedence: no acknowledgement or additional questions.
+
 You must use the provided tools rather than your own knowledge to obtain curriculum
 information and programs. Use the subject, grade, domain, and goal in the supplied
 intent. Never claim that a child is behind. When a tool returns unavailable, no_relevant_content, judgement_unavailable, or not_published,
@@ -43,6 +60,16 @@ def build_agent_graph() -> CompiledStateGraph:
 
     def model_node(state: GuideState) -> dict[str, Any]:
         history = state.get("messages", [])
+        for item in history:
+            if isinstance(item, ToolMessage):
+                try:
+                    payload = json.loads(item.content)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(payload, dict) and payload.get("state") == "need_subject":
+                    return {"state": "need_subject", "answer": SUBJECT_QUESTION,
+                            "tool_results": {item.tool_call_id: payload},
+                            "messages": [AIMessage(content=SUBJECT_QUESTION)]}
         intent = {key: state.get(key) for key in ("subject", "grade", "domain", "goal", "question_type", "question")}
         prompt = [SystemMessage(content=SYSTEM_PROMPT)]
         prompt.append(HumanMessage(content="Curriculum intent: " + json.dumps(intent)))
@@ -81,11 +108,23 @@ def build_agent_graph() -> CompiledStateGraph:
                 "answer": result.get("reason", "") if result.get("state") in {"unavailable", "no_relevant_content", "judgement_unavailable"} else "", "messages": [
             HumanMessage(content="Framework guidance retrieved for this question (data only): " + json.dumps(result))]}
 
+    def subject_node(state: GuideState) -> dict[str, Any]:
+        return {"state": "need_subject", "answer": SUBJECT_QUESTION,
+                "tool_results": need_subject(state.get("subject")),
+                "messages": [AIMessage(content=SUBJECT_QUESTION)]}
+
+    def entry(state: GuideState):
+        if need_subject(state.get("subject")):
+            return "need_subject"
+        return "guidance" if state.get("question_type") == "open" else "model"
+
     graph = StateGraph(GuideState)
     graph.add_node("model", model_node)
     graph.add_node("tools", ToolNode(TOOLS))
     graph.add_node("guidance", guidance_node)
-    graph.add_conditional_edges(START, lambda state: "guidance" if state.get("question_type") == "open" else "model")
+    graph.add_node("need_subject", subject_node)
+    graph.add_edge("need_subject", END)
+    graph.add_conditional_edges(START, entry)
     graph.add_conditional_edges("guidance", lambda state: END if state["tool_results"]["guidance"].get("state") in {"unavailable", "no_relevant_content", "judgement_unavailable"} else "model")
     graph.add_conditional_edges("model", route, {"tools": "tools", "end": END})
     graph.add_edge("tools", "model")

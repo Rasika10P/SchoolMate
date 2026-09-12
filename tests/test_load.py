@@ -15,7 +15,7 @@ def test_csvs_are_typed_and_endpoints_exist() -> None:
     edges = load.read_csv(DATA / "progression.csv", load.ProgressionEdge)
     descriptors = load.read_csv(DATA / "ald.csv", load.AchievementDescriptor)
     assert standards
-    assert edges and len(descriptors) == 3
+    assert edges and descriptors == []
     endpoints = {(row.framework_id, row.code)
                  for filename, framework in load.SUBJECT_FILES.items()
                  for row in load.read_subject(DATA / filename, framework)[0]}
@@ -159,7 +159,7 @@ def test_all_subjects_load_and_repeat_without_changes(loader_db):
                    for filename, framework in SUBJECT_FILES.items())
     assert {c.table: c.rows for c in report.tables} == {
         'framework': 7, 'standard': expected - 12, 'standard_variant': expected,
-        'progression_edge': len(load.read_csv(DATA / 'progression.csv', load.ProgressionEdge)), 'achievement_descriptor': 3,
+        'progression_edge': len(load.read_csv(DATA / 'progression.csv', load.ProgressionEdge)), 'achievement_descriptor': len(load.read_csv(DATA / 'ald.csv', load.AchievementDescriptor)),
     }
     assert report.frameworks['CA-NGSS-2013']['standard'] == 78
     assert report.frameworks['CA-NGSS-2013']['standard_variant'] == 90
@@ -222,7 +222,7 @@ def test_missing_files_and_dangling_references(partial_data, loader_db, capsys):
     assert 'progression.csv: row 5:' in report.rejected_rows[0]
     assert 'unknown framework' in report.rejected_rows[0]
     assert 'missing standard' in report.rejected_rows[1]
-    assert 'ald.csv: row 5:' in report.rejected_rows[2]
+    assert 'ald.csv: row 2:' in report.rejected_rows[2]
     assert {c.table: c.rows for c in report.tables}['progression_edge'] == 3
     load.main(['--data-dir', str(partial_data)])
     output = capsys.readouterr().out
@@ -231,7 +231,9 @@ def test_missing_files_and_dangling_references(partial_data, loader_db, capsys):
     assert 'CA-CCSSM-2013: standard=179' in output
 
 
-def test_late_failure_rolls_back_every_insert(loader_db):
+def test_late_failure_rolls_back_every_insert(loader_db, partial_data):
+    with (partial_data / "ald.csv").open("a") as handle:
+        handle.write("CA-CCSSM-2013,4,mathematics,2,Test-only descriptor\n")
     database, conn, _ = loader_db
     cursor = conn.cursor.return_value.__enter__.return_value
     insert = cursor.executemany.side_effect
@@ -243,7 +245,7 @@ def test_late_failure_rolls_back_every_insert(loader_db):
 
     cursor.executemany.side_effect = fail
     with pytest.raises(RuntimeError, match='late failure'):
-        load.load_data(DATA)
+        load.load_data(partial_data)
     for table in ['framework', 'standard', 'standard_variant', 'progression_edge', 'achievement_descriptor']:
         assert database.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == 0
 

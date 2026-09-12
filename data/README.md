@@ -1,6 +1,8 @@
 The subject CSVs contain California curriculum standards. `maths.csv` also
-retains three illustrative records; `progression.csv` and `ald.csv` contain three
-illustrative rows each, not verified official progressions or descriptors.
+retains three illustrative records. `progression.csv` contains reviewed progression
+links. `ald.csv` currently contains only its header: the three illustrative
+achievement descriptors have been removed. No official achievement descriptions
+are currently loaded.
 Blank `page` means SQL NULL.
 
 To append standards copied from a PDF, run from the project root with your source
@@ -178,3 +180,22 @@ Review the full source texts and URLs in the candidate CSV. The `relation`
 column is intentionally blank. Only after confirming a relationship, assign
 its relation and copy the five progression columns into `progression.csv`;
 do not append the review-only columns. The script never changes live edges.
+
+
+### Subject clarification and child assessment data
+
+All five tools return `need_subject` for a missing or unknown subject, with the
+seven subjects listed in parent-facing language. The agent asks only
+“Which subject did you have in mind?” before making any model or tool calls
+when no valid subject is supplied. It also handles an invented tool subject
+without crashing.
+
+The agent system prompt forbids requesting grades, test scores, report cards,
+teacher feedback, or any assessment of a child. It instructs the agent to
+acknowledge volunteered assessment data without echoing or storing it, avoid
+evaluating the child, and answer the underlying California curriculum question.
+These are prompt instructions, not a claim of application-wide data redaction.
+
+The loader preserves existing database rows on conflict. Deleting records from
+`ald.csv` does not delete previously loaded database records; the three exact
+illustrative descriptors were removed separately from Postgres.

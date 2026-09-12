@@ -7,7 +7,8 @@ from langgraph.graph.message import add_messages
 
 
 class GuideState(TypedDict):
-    subject: str
+    subject: str | None
+    state: NotRequired[str]
     grade: int | None
     domain: str | None
     goal: str | None

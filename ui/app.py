@@ -411,7 +411,7 @@ def results_screen() -> None:
         if result.get("answer"):
             st.write(result["answer"])
         elif not result.get("subject"):
-            st.info("Please include the subject in your question so I can find relevant guidance.")
+            st.info("Which subject did you have in mind?")
         else:
             st.info("Please include the grade in your question so I can find learning information for that year.")
         return

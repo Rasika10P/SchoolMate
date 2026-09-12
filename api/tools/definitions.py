@@ -50,6 +50,22 @@ CATALOG: dict[str, tuple[Program, ...]] = {
 }
 
 
+SUBJECT_NAMES = {
+    "math": "Mathematics", "ela": "English language arts",
+    "eld": "English language development", "sci": "Science",
+    "hss": "History and social science", "vapa": "Visual and performing arts",
+    "pe": "Physical education",
+}
+SUBJECT_QUESTION = "Which subject did you have in mind?"
+
+
+def need_subject(subject):
+    if isinstance(subject, str) and subject in FRAMEWORK_BY_SUBJECT:
+        return None
+    return {"state": "need_subject", "reason": SUBJECT_QUESTION + " Choose from: " +
+            ", ".join(SUBJECT_NAMES[key] for key in FRAMEWORK_BY_SUBJECT) + "."}
+
+
 def _validate_grade(grade: int) -> None:
     if isinstance(grade, bool) or not isinstance(grade, int) or not 0 <= grade <= 5:
         raise ValueError("grade must be an integer from 0 (kindergarten) to 5")
@@ -66,14 +82,14 @@ def _curriculum(
     subject: str, grade: int, domain: str | None,
     direction: Literal["forward", "backward"] | None,
 ) -> dict[str, Any]:
+    missing = need_subject(subject)
+    if missing:
+        return missing
     _validate_grade(grade)
     tab = "standing" if direction is None else "next_steps"
     if not capability.supports(subject, tab, grade):
         return {"state": "not_published", "reason": capability.NOT_PUBLISHED_REASON[subject, tab]}
-    try:
-        framework_id = FRAMEWORK_BY_SUBJECT[subject]
-    except KeyError:
-        raise ValueError(f"Unsupported subject {subject!r}; expected one of {', '.join(FRAMEWORK_BY_SUBJECT)}") from None
+    framework_id = FRAMEWORK_BY_SUBJECT[subject]
     with get_conn() as conn:
         result = get_guidance(conn, framework_id, grade, domain, direction)
     payload = asdict(result)
@@ -86,26 +102,29 @@ def _curriculum(
 
 
 @tool
-def on_grade_level(subject: str, grade: int, domain: str | None = None) -> dict[str, Any]:
+def on_grade_level(subject: str | None = None, grade: int | None = None, domain: str | None = None) -> dict[str, Any]:
     """Help me understand what my child should learn in their current grade and what different achievement levels look like."""
     return _curriculum(subject, grade, domain, None)
 
 
 @tool
-def working_ahead(subject: str, grade: int, domain: str | None = None) -> dict[str, Any]:
+def working_ahead(subject: str | None = None, grade: int | None = None, domain: str | None = None) -> dict[str, Any]:
     """Help me find the next skills for my child who is ready to move beyond their current grade's learning."""
     return _curriculum(subject, grade, domain, "forward")
 
 
 @tool
-def catching_up(subject: str, grade: int, domain: str | None = None) -> dict[str, Any]:
+def catching_up(subject: str | None = None, grade: int | None = None, domain: str | None = None) -> dict[str, Any]:
     """Help me find earlier skills my child can revisit to catch up with their current grade's learning."""
     return _curriculum(subject, grade, domain, "backward")
 
 
 @tool
-def competition_prep(subject: str, grade: int) -> dict[str, Any]:
+def competition_prep(subject: str | None = None, grade: int | None = None) -> dict[str, Any]:
     """Help me find competition preparation for my child's subject and grade, or understand when it is not published."""
+    missing = need_subject(subject)
+    if missing:
+        return missing
     _validate_grade(grade)
     published = capability.supports(subject, "programs", grade)
     target = "ela" if subject == "eld" else subject
@@ -122,10 +141,11 @@ def competition_prep(subject: str, grade: int) -> dict[str, Any]:
 
 
 @tool
-def search_guidance(subject: str, question: str, grade: int | None = None) -> dict[str, Any]:
+def search_guidance(subject: str | None = None, question: str = "", grade: int | None = None) -> dict[str, Any]:
     """Answer my open-ended questions about how my child's subject is taught, using teaching guidance that a standards list cannot provide."""
-    if subject not in FRAMEWORK_BY_SUBJECT:
-        raise ValueError(f"Unsupported subject {subject!r}")
+    missing = need_subject(subject)
+    if missing:
+        return missing
     if grade is not None:
         _validate_grade(grade)
     return guidance.search(question, FRAMEWORK_BY_SUBJECT[subject], grade=grade)

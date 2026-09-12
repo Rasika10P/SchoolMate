@@ -58,7 +58,7 @@ def test_unknown_question_goes_to_results_without_blocking(monkeypatch):
     assert not page.exception
     assert page.session_state.stage == "results"
     assert not page.warning
-    assert any("include the subject" in m.value for m in page.info)
+    assert any("Which subject did you have in mind?" == m.value for m in page.info)
     assert [b.key for b in page.button if b.label == "Add"] == []
     navigate(page, 'About')
     navigate(page, 'Guide')

@@ -27,7 +27,7 @@ def _select(state: GuideState) -> dict[str, Any]:
 def _render(state: GuideState) -> dict[str, str]:
     result = state["tool_results"]
     status = result.get("state", "available")
-    if status == "not_published":
+    if status in {"not_published", "need_subject"}:
         return {"answer": result["reason"]}
     if status not in ("available", "redirect"):
         raise ValueError(f"Unknown tool result state {status!r}")
