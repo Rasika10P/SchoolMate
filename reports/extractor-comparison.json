@@ -1,0 +1,902 @@
+[
+  {
+    "id": "G01",
+    "model": "fireworks_ai/accounts/fireworks/models/llama-v3p1-8b-instruct",
+    "ask": true,
+    "question": "What should I teach my 2 ne grader at home for math",
+    "expected": {
+      "subject": "math",
+      "grade": 2,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": null,
+    "matches": {},
+    "latency": 1.7916568749933504,
+    "usage": {
+      "calls": 1,
+      "tokens": 0,
+      "cost": 0
+    },
+    "error": "NotFoundError"
+  },
+  {
+    "id": "G01",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "What should I teach my 2 ne grader at home for math",
+    "expected": {
+      "subject": "math",
+      "grade": 2,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "math",
+      "grade": 2,
+      "domain": null,
+      "goal": null,
+      "raw": "What should I teach my 2 ne grader at home for math",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "math",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 2.1645381249836646,
+    "usage": {
+      "calls": 1,
+      "tokens": 446,
+      "cost": 0.00010334999999999999
+    },
+    "error": null
+  },
+  {
+    "id": "G02",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "How to sclae my 3rd grader in writting",
+    "expected": {
+      "subject": "ela",
+      "grade": 3,
+      "goal": "working_ahead",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "ela",
+      "grade": 3,
+      "domain": null,
+      "goal": null,
+      "raw": "How to sclae my 3rd grader in writting",
+      "question_type": "open",
+      "evidence": {
+        "subject": "ela",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 0.7977968750055879,
+    "usage": {
+      "calls": 1,
+      "tokens": 445,
+      "cost": 0.0001032
+    },
+    "error": null
+  },
+  {
+    "id": "G03",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "How does math curriculam decided by state education",
+    "expected": {
+      "subject": "math",
+      "grade": null,
+      "goal": null,
+      "question_type": "open"
+    },
+    "intent": {
+      "subject": "math",
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "How does math curriculam decided by state education",
+      "question_type": "open",
+      "evidence": {
+        "subject": "",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": true,
+      "question_type": true
+    },
+    "latency": 0.7679585829901043,
+    "usage": {
+      "calls": 1,
+      "tokens": 421,
+      "cost": 8.969999999999998e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G04",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "What sports I should enroll my kids for",
+    "expected": {
+      "subject": "pe",
+      "grade": null
+    },
+    "intent": {
+      "subject": "pe",
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "What sports I should enroll my kids for",
+      "question_type": "open",
+      "evidence": {
+        "subject": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 0.9661578340164851,
+    "usage": {
+      "calls": 1,
+      "tokens": 420,
+      "cost": 9e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G05",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Do my kid must have knwoldege of one musical instrumnet",
+    "expected": {
+      "subject": "vapa",
+      "grade": null,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "vapa",
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "Do my kid must have knwoldege of one musical instrumnet",
+      "question_type": "open",
+      "evidence": {
+        "subject": "vapa"
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 1.5192599589936435,
+    "usage": {
+      "calls": 1,
+      "tokens": 431,
+      "cost": 9.345e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G06",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Does prsence in music and arts define my kids college admission",
+    "expected": {
+      "subject": "vapa",
+      "grade": null
+    },
+    "intent": {
+      "subject": "vapa",
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "Does prsence in music and arts define my kids college admission",
+      "question_type": "open",
+      "evidence": {
+        "subject": "vapa"
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 1.604446708020987,
+    "usage": {
+      "calls": 1,
+      "tokens": 428,
+      "cost": 9.3e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G07",
+    "model": "openai/gpt-4o-mini",
+    "ask": false,
+    "question": "what competetive exams a 2nd grader can particpate into for STEM topics",
+    "expected": {
+      "subject": "math, science",
+      "grade": 2,
+      "goal": "competition_prep",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": null,
+      "grade": 2,
+      "domain": null,
+      "goal": null,
+      "raw": "what competetive exams a 2nd grader can particpate into for STEM topics",
+      "question_type": "open",
+      "evidence": {
+        "subject": "",
+        "grade": "",
+        "goal": "The parent is inquiring about competitive exams for a 2nd grader in STEM topics."
+      }
+    },
+    "matches": {
+      "subject": false,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 1.1621466249926016,
+    "usage": {
+      "calls": 1,
+      "tokens": 449,
+      "cost": 0.00010290000000000001
+    },
+    "error": null
+  },
+  {
+    "id": "G08",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "How does spelling be help with growth in English",
+    "expected": {
+      "subject": "ela",
+      "grade": null,
+      "goal": null,
+      "question_type": "open"
+    },
+    "intent": {
+      "subject": "ela",
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "How does spelling be help with growth in English",
+      "question_type": "open",
+      "evidence": {
+        "subject": "ela"
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": true,
+      "question_type": true
+    },
+    "latency": 0.7068967499944847,
+    "usage": {
+      "calls": 1,
+      "tokens": 423,
+      "cost": 9.135e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G09",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Which type of writting is taught for 2nd grader",
+    "expected": {
+      "subject": "ela",
+      "grade": 2,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "ela",
+      "grade": 2,
+      "domain": null,
+      "goal": null,
+      "raw": "Which type of writting is taught for 2nd grader",
+      "question_type": "open",
+      "evidence": {
+        "subject": "ela",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 1.2664217079873197,
+    "usage": {
+      "calls": 1,
+      "tokens": 444,
+      "cost": 0.0001026
+    },
+    "error": null
+  },
+  {
+    "id": "G10",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "what sceince project exeperimnets shouild be done by parents at home",
+    "expected": {
+      "subject": "sci",
+      "grade": null,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "sci",
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "what sceince project exeperimnets shouild be done by parents at home",
+      "question_type": "open",
+      "evidence": {
+        "subject": "sci"
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 0.7725249170034658,
+    "usage": {
+      "calls": 1,
+      "tokens": 433,
+      "cost": 9.375e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G11",
+    "model": "openai/gpt-4o-mini",
+    "ask": false,
+    "question": "My kids I feel is good in 2nd grade math, how can I prep her in advance for 3rd grade",
+    "expected": {
+      "subject": "math",
+      "grade": 2,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "math",
+      "grade": 2,
+      "domain": null,
+      "goal": "working_ahead",
+      "raw": "My kids I feel is good in 2nd grade math, how can I prep her in advance for 3rd grade",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "math",
+        "goal": "working_ahead"
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 1.2043377090012655,
+    "usage": {
+      "calls": 1,
+      "tokens": 479,
+      "cost": 0.00011775
+    },
+    "error": null
+  },
+  {
+    "id": "G12",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "My 4th grader is struggling with fractions",
+    "expected": {
+      "subject": "math",
+      "grade": 4,
+      "goal": "catching_up",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "math",
+      "grade": 4,
+      "domain": "fractions",
+      "goal": "catching_up",
+      "raw": "My 4th grader is struggling with fractions",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "math",
+        "goal": "catching_up"
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": true,
+      "question_type": true
+    },
+    "latency": 1.3676188329991419,
+    "usage": {
+      "calls": 1,
+      "tokens": 433,
+      "cost": 9.735e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G13",
+    "model": "openai/gpt-4o-mini",
+    "ask": false,
+    "question": "Is my 3rd grader on track in history?",
+    "expected": {
+      "subject": "hss",
+      "grade": 3,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "hss",
+      "grade": 3,
+      "domain": null,
+      "goal": null,
+      "raw": "Is my 3rd grader on track in history?",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "hss",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 0.9159918749937788,
+    "usage": {
+      "calls": 1,
+      "tokens": 444,
+      "cost": 0.00010305
+    },
+    "error": null
+  },
+  {
+    "id": "G14",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Which school should I send my child to?",
+    "expected": {
+      "subject": null,
+      "grade": null
+    },
+    "intent": {
+      "subject": null,
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "Which school should I send my child to?",
+      "question_type": "open",
+      "evidence": {}
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 0.6482037919922732,
+    "usage": {
+      "calls": 1,
+      "tokens": 421,
+      "cost": 9.015000000000001e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G15",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Is my child behind?",
+    "expected": {
+      "subject": "math",
+      "grade": 3,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": null,
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "Is my child behind?",
+      "question_type": "open",
+      "evidence": {}
+    },
+    "matches": {
+      "subject": false,
+      "grade": false,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 0.6385845420008991,
+    "usage": {
+      "calls": 1,
+      "tokens": 417,
+      "cost": 8.955e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G16",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Is my child gifted?",
+    "expected": {
+      "subject": null,
+      "grade": null
+    },
+    "intent": {
+      "subject": null,
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "Is my child gifted?",
+      "question_type": "open",
+      "evidence": {}
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 0.7224345830036327,
+    "usage": {
+      "calls": 1,
+      "tokens": 417,
+      "cost": 8.955e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G17",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "how do I get into a magnet school",
+    "expected": {
+      "subject": null,
+      "grade": null
+    },
+    "intent": {
+      "subject": null,
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "how do I get into a magnet school",
+      "question_type": "open",
+      "evidence": {
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 0.6529112079879269,
+    "usage": {
+      "calls": 1,
+      "tokens": 419,
+      "cost": 8.94e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G18",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Tell me more about ELD programs for 3rd grader",
+    "expected": {
+      "subject": "eld",
+      "grade": 3,
+      "goal": "competition_prep",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "eld",
+      "grade": 3,
+      "domain": null,
+      "goal": null,
+      "raw": "Tell me more about ELD programs for 3rd grader",
+      "question_type": "open",
+      "evidence": {
+        "subject": "eld",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 0.8913707920000888,
+    "usage": {
+      "calls": 1,
+      "tokens": 445,
+      "cost": 0.0001032
+    },
+    "error": null
+  },
+  {
+    "id": "G19",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Tell me areas I need to cover for 2nd grader in history",
+    "expected": {
+      "subject": "hss",
+      "grade": 2,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "hss",
+      "grade": 2,
+      "domain": null,
+      "goal": null,
+      "raw": "Tell me areas I need to cover for 2nd grader in history",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "hss",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 0.9365485000016633,
+    "usage": {
+      "calls": 1,
+      "tokens": 449,
+      "cost": 0.00010469999999999998
+    },
+    "error": null
+  },
+  {
+    "id": "G20",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "How can I home school my child, provide guide",
+    "expected": {
+      "subject": null,
+      "grade": null
+    },
+    "intent": {
+      "subject": null,
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "How can I home school my child, provide guide",
+      "question_type": "open",
+      "evidence": {
+        "subject": "",
+        "grade": "",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 0.6774867500062101,
+    "usage": {
+      "calls": 1,
+      "tokens": 419,
+      "cost": 8.85e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G21",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Can I share my results from grade 2 so you can help with grade 3 prep for my child",
+    "expected": {
+      "subject": null,
+      "grade": 2,
+      "goal": "working_ahead",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": null,
+      "grade": 2,
+      "domain": null,
+      "goal": "competition_prep",
+      "raw": "Can I share my results from grade 2 so you can help with grade 3 prep for my child",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "",
+        "grade": "",
+        "goal": "I want help with grade 3 prep for my child."
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 0.8260941249900497,
+    "usage": {
+      "calls": 1,
+      "tokens": 446,
+      "cost": 9.975e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G22",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Tell em what I should cover as History for 4th grader",
+    "expected": {
+      "subject": "hss",
+      "grade": 4,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "hss",
+      "grade": 4,
+      "domain": null,
+      "goal": null,
+      "raw": "Tell em what I should cover as History for 4th grader",
+      "question_type": "open",
+      "evidence": {
+        "subject": "hss",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": false
+    },
+    "latency": 0.8170877919765189,
+    "usage": {
+      "calls": 1,
+      "tokens": 449,
+      "cost": 0.00010515000000000001
+    },
+    "error": null
+  },
+  {
+    "id": "G23",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Tell me what I should cover in ELa for 3rd grader",
+    "expected": {
+      "subject": "ela",
+      "grade": 3,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": "ela",
+      "grade": 3,
+      "domain": null,
+      "goal": null,
+      "raw": "Tell me what I should cover in ELa for 3rd grader",
+      "question_type": "structured",
+      "evidence": {
+        "subject": "ela",
+        "goal": ""
+      }
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 0.8126478329941165,
+    "usage": {
+      "calls": 1,
+      "tokens": 447,
+      "cost": 0.0001035
+    },
+    "error": null
+  },
+  {
+    "id": "G24",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Here are the grades my child recived in grade 4, tell me what areas I need to improve",
+    "expected": {
+      "subject": null,
+      "grade": 4,
+      "goal": "on_grade_level",
+      "question_type": "structured"
+    },
+    "intent": {
+      "subject": null,
+      "grade": 4,
+      "domain": null,
+      "goal": null,
+      "raw": "Here are the grades my child recived in grade 4, tell me what areas I need to improve",
+      "question_type": "structured",
+      "evidence": {}
+    },
+    "matches": {
+      "subject": true,
+      "grade": true,
+      "goal": false,
+      "question_type": true
+    },
+    "latency": 0.858248000004096,
+    "usage": {
+      "calls": 1,
+      "tokens": 435,
+      "cost": 9.314999999999999e-05
+    },
+    "error": null
+  },
+  {
+    "id": "G25",
+    "model": "openai/gpt-4o-mini",
+    "ask": true,
+    "question": "Do schols do anything for eq learning",
+    "expected": {
+      "subject": null,
+      "grade": null
+    },
+    "intent": {
+      "subject": null,
+      "grade": null,
+      "domain": null,
+      "goal": null,
+      "raw": "Do schols do anything for eq learning",
+      "question_type": "open",
+      "evidence": {}
+    },
+    "matches": {
+      "subject": true,
+      "grade": true
+    },
+    "latency": 0.6995918340107892,
+    "usage": {
+      "calls": 1,
+      "tokens": 420,
+      "cost": 9e-05
+    },
+    "error": null
+  }
+]

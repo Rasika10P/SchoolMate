@@ -242,6 +242,7 @@ def cached_complete(
         raise ValueError("Streaming is unsupported by this dict-returning wrapper")
     if any(kw.get(key) for key in ("num_retries", "max_retries", "fallbacks")):
         raise ValueError("Retry and fallback attempts must go through cached_complete")
+    # Model identity is hashed with the prompt: switching providers cannot reuse old extractions.
     request = dict(messages=messages, model=model, tools=tools, temperature=temperature, **kw)
     enabled = os.getenv("LLM_CACHE", "on").strip().lower() != "off"
     path: Path | None = None
