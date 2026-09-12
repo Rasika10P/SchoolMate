@@ -59,6 +59,36 @@ class Usage:
 usage = Usage()
 
 
+_run_usage: ContextVar[Usage | None] = ContextVar("run_usage", default=None)
+
+
+def begin_run():
+    """Start isolated submission accounting, including propagated tool contexts."""
+    report = Usage()
+    return report, _run_usage.set(report)
+
+
+def end_run(handle) -> dict[str, Any]:
+    report, token = handle
+    _run_usage.reset(token)
+    entries = list(report.models.values())
+    return {"calls": sum(e.calls for e in entries),
+            "tokens": sum(e.prompt_tokens + e.completion_tokens for e in entries),
+            "cost": None if any(e.estimated_cost is None and e.calls for e in entries)
+                    else sum(e.estimated_cost or 0 for e in entries)}
+
+
+def _usage_entries(model: str):
+    yield _model_usage(model)
+    report = _run_usage.get()
+    if report is not None:
+        entry = report.models.setdefault(model, ModelUsage())
+        prices = PRICES.get(model, {})
+        if any(prices.get(k) is None for k in ("input", "output")):
+            entry.estimated_cost = None
+        yield entry
+
+
 def _model_usage(model: str) -> ModelUsage:
     """Caller holds _lock."""
     entry = usage.models.setdefault(model, ModelUsage())
@@ -228,7 +258,8 @@ def cached_complete(
             logger.warning("Ignoring invalid cache file %s", path)
         else:
             with _lock:
-                _model_usage(model).cache_hits += 1
+                for entry in _usage_entries(model):
+                    entry.cache_hits += 1
             trace = _trace.get()
             if trace is not None:
                 trace.cached = True
@@ -236,17 +267,18 @@ def cached_complete(
 
     _reserve_call()
     with _lock:
-        _model_usage(model).calls += 1
+        for entry in _usage_entries(model):
+            entry.calls += 1
     provider_request = {k: v for k, v in request.items() if k not in ("num_retries", "max_retries", "fallbacks")}
     response = _provider_complete(**provider_request)
     prompt, completion = _tokens(response)
     with _lock:
-        entry = _model_usage(model)
-        entry.prompt_tokens += prompt
-        entry.completion_tokens += completion
-        if entry.estimated_cost is not None:
-            prices = PRICES[model]
-            entry.estimated_cost += (prompt * float(prices["input"]) + completion * float(prices["output"])) / 1_000_000
+        for entry in _usage_entries(model):
+            entry.prompt_tokens += prompt
+            entry.completion_tokens += completion
+            if entry.estimated_cost is not None:
+                prices = PRICES[model]
+                entry.estimated_cost += (prompt * float(prices["input"]) + completion * float(prices["output"])) / 1_000_000
     if path is not None:
         _write_cache(path, response)
     return response

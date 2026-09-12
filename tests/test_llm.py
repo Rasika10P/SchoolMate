@@ -205,3 +205,24 @@ def test_provider_adapter_disables_retries(monkeypatch: pytest.MonkeyPatch) -> N
     assert llm._provider_complete(messages=MESSAGES, model=MODEL) == RESPONSE
     completion.assert_called_once_with(messages=MESSAGES, model=MODEL, num_retries=0)
     response.model_dump.assert_called_once_with(mode="json")
+
+
+def test_run_usage_isolated_from_other_contexts_and_cached_submissions(provider):
+    from contextvars import Context
+    handle = llm.begin_run()
+    Context().run(llm.cached_complete, MESSAGES, MODEL)
+    llm.cached_complete([{"role": "user", "content": "This submission"}], MODEL)
+    report = llm.end_run(handle)
+    assert report == {"calls": 1, "tokens": 125, "cost": pytest.approx(0.0003)}
+    assert llm.usage.models[MODEL].calls == 2
+    cached = llm.begin_run()
+    llm.cached_complete(MESSAGES, MODEL)
+    assert llm.end_run(cached) == {"calls": 0, "tokens": 0, "cost": 0}
+
+
+def test_failed_provider_attempt_is_in_run_usage(monkeypatch):
+    monkeypatch.setattr(llm, '_provider_complete', Mock(side_effect=RuntimeError('offline')))
+    handle = llm.begin_run()
+    with pytest.raises(RuntimeError, match='offline'):
+        llm.cached_complete(MESSAGES, MODEL)
+    assert llm.end_run(handle)['calls'] == 1

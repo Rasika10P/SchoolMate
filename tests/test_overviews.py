@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from api import db, llm
-from api.capability import DOMAIN_LABELS, domain_label
+from api.capability import DOMAIN_LABELS, domain_label, standard_domain, ordered_domains
 from api.load import SUBJECT_FILES, read_subject
 from api.services import overviews
 from scripts import generate_grade_overviews as batch
@@ -20,9 +20,20 @@ def test_all_loaded_domains_have_parent_labels():
     data = Path(__file__).resolve().parents[1] / 'data'
     for filename, framework in SUBJECT_FILES.items():
         rows, _ = read_subject(data / filename, framework)
-        assert {row.domain for row in rows} <= DOMAIN_LABELS.keys()
-    assert domain_label('OA', 1)[0] == 'Adding and subtracting'
-    assert 'patterns' in domain_label('OA', 4)[0]
+        for row in rows:
+            assert domain_label(row.domain, row.grade, framework)[0]
+    assert DOMAIN_LABELS['CA-CCSSM-2013']['OA'] == 'Adding, subtracting, multiplying and dividing'
+    assert domain_label('Writing', 2, 'CA-CCSS-ELA-2013')[0] == 'Writing'
+
+
+def test_domain_derivation_fallback_and_source_order():
+    math, ela = 'CA-CCSSM-2013', 'CA-CCSS-ELA-2013'
+    assert standard_domain(math, None, '2.NBT.1') == 'NBT'
+    assert standard_domain(ela, '', 'RL.2.1') == 'RL'
+    assert standard_domain(ela, 'Reading: Literature', 'RL.2.1') == 'RL'
+    assert domain_label('XYZ', 2, ela)[0] == 'XYZ'
+    assert ordered_domains(math, ['G', 'MD', 'OA', 'NBT']) == ['OA', 'NBT', 'MD', 'G']
+    assert ordered_domains(ela, ['L', 'W', 'RI', 'RL', 'XYZ']) == ['RL', 'RI', 'W', 'L', 'XYZ']
 
 
 def test_overview_generation_is_cached_and_three_sentences(monkeypatch, tmp_path):

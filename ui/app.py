@@ -20,7 +20,7 @@ import streamlit as st
 import psycopg
 
 from api import llm
-from api.capability import SUBJECTS, NOT_PUBLISHED_REASON, supports, domain_label
+from api.capability import SUBJECTS, NOT_PUBLISHED_REASON, supports, domain_label, standard_domain, ordered_domains
 from api.db import get_conn
 from api.graph.agentic import build_agent_graph
 from api.graph.deterministic import build_deterministic_graph
@@ -100,12 +100,8 @@ def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode
             "subject": subject, "grade": grade, "domain": domain, "goal": goal, "mode": mode}
 
 
-def _usage_snapshot() -> tuple[int, int, float, int]:
-    entries = list(llm.usage.models.values())
-    return (sum(row.calls for row in entries),
-            sum(row.prompt_tokens + row.completion_tokens for row in entries),
-            sum(row.estimated_cost or 0 for row in entries),
-            sum(row.calls for row in entries if row.estimated_cost is None))
+def _usage_snapshot():
+    return llm.begin_run()
 
 
 def _show_failure(exc: Exception) -> None:
@@ -139,11 +135,9 @@ def database_diagnostics() -> dict[str, Any]:
         return {"reachable": reachable, "rows": [], "error": f"{type(exc).__name__}: {exc}"}
 
 
-def _record_usage(before: tuple[int, int, float, int], started: float, mode: str | None = None) -> None:
-    after = _usage_snapshot()
-    metrics = {"calls": after[0] - before[0], "tokens": after[1] - before[1],
-               "elapsed": perf_counter() - started,
-               "cost": None if after[3] > before[3] else after[2] - before[2]}
+def _record_usage(before, started: float, mode: str | None = None) -> None:
+    metrics = llm.end_run(before)
+    metrics["elapsed"] = perf_counter() - started
     if mode is None:
         st.session_state.extraction_usage = metrics
     else:
@@ -228,7 +222,7 @@ def entry_screen() -> None:
                 return
             _record_usage(before, started)
             st.session_state.extracted_intent = intent
-            _submit_question(intent)
+            _submit_question(intent, review_usage=st.session_state.extraction_usage)
 
 
 @st.cache_data(show_spinner=False)
@@ -247,7 +241,8 @@ def _normalize_intent(intent: dict[str, Any]) -> dict[str, Any]:
             "evidence": dict(evidence) if isinstance(evidence, dict) else {}}
 
 
-def _submit_question(intent: dict[str, Any], *, rerun: bool = True) -> None:
+def _submit_question(intent: dict[str, Any], *, rerun: bool = True,
+                     review_usage: dict[str, Any] | None = None) -> None:
     intent = _normalize_intent(intent)
     is_open = intent["question_type"] == "open"
     if is_open:
@@ -274,6 +269,12 @@ def _submit_question(intent: dict[str, Any], *, rerun: bool = True) -> None:
             result["explanation_error"] = True
         finally:
             _record_usage(before, started, mode)
+            if review_usage:
+                metrics = st.session_state.mode_stats[mode]
+                for key in ("calls", "tokens", "elapsed"):
+                    metrics[key] += review_usage[key]
+                metrics["cost"] = (None if metrics["cost"] is None or review_usage["cost"] is None
+                                   else metrics["cost"] + review_usage["cost"])
     st.session_state.active_entry = "Ask me anything"
     st.session_state.results = result
     st.session_state.stage = "results"
@@ -326,25 +327,29 @@ def _standards_table(records: list[dict[str, Any]]) -> None:
 def _domain_sections(records: list[dict[str, Any]], grade: int, overviews: dict[str, str]) -> None:
     if not records:
         return
-    frameworks = sorted({record["framework_id"] for record in records})
+    frameworks = list(dict.fromkeys(record["framework_id"] for record in records))
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for record in records:
+        framework = record["framework_id"]
+        domain = standard_domain(framework, record.get("domain"), record["code"])
+        groups.setdefault((framework, domain), []).append(record)
     for framework in frameworks:
+        domains = ordered_domains(framework, [d for f, d in groups if f == framework])
         text = overviews.get(f"{framework}|{grade}")
-        if text and len(re.split(r"(?<=[.!?])\s+", text.strip())) <= 2:
+        if text:
             st.write(text)
         else:
-            # A useful static fallback until the offline job stores an overview.
-            areas = sorted({domain_label(r["domain"], grade)[0].lower()
-                            for r in records if r["framework_id"] == framework})
+            areas = [domain_label(d, grade, framework)[0].lower() for d in domains]
             st.write("This grade includes " + ", ".join(areas) +
                      ". Open an area to see the skills and any available everyday examples.")
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for record in records:
-        groups.setdefault(record["domain"], []).append(record)
-    for domain, rows in sorted(groups.items(), key=lambda item: domain_label(item[0], grade)[0]):
-        heading, _ = domain_label(domain, grade)
-        with st.expander(heading, expanded=False):
-            st.write(domain_label(rows[0]["domain"], grade)[1])
-            _standards_table(rows)
+        for domain in domains:
+            rows = groups[(framework, domain)]
+            heading, description = domain_label(domain, grade, framework)
+            count = len(rows)
+            with st.expander(f"{heading} · {count} {'skill' if count == 1 else 'skills'}", expanded=False):
+                if description:
+                    st.write(description)
+                _standards_table(rows)
 
 
 def _source_documents(content: dict[str, Any], subject: str, grade: int) -> list[dict[str, Any]]:
@@ -628,76 +633,146 @@ def _select_mode() -> None:
     st.session_state.mode = st.session_state._mode_choice
 
 
+def _refresh_sources() -> None:
+    """Explicit read-only refresh; navigation never performs network work."""
+    snapshot: dict[str, Any] = {"tables": {}, "frameworks": []}
+    try:
+        with get_conn() as conn, conn.cursor() as cursor:
+            cursor.execute("SELECT 'standard', COUNT(*) FROM standard UNION ALL "
+                           "SELECT 'progression_edge', COUNT(*) FROM progression_edge UNION ALL "
+                           "SELECT 'achievement_descriptor', COUNT(*) FROM achievement_descriptor")
+            snapshot["tables"] = dict(cursor.fetchall())
+    except Exception:
+        snapshot["database_error"] = "Database counts are unavailable."
+        logger.exception("Source counts failed")
+    try:
+        from api.services.guidance import _pinecone
+        _, index = _pinecone()
+        stats = index.describe_index_stats()
+        if hasattr(stats, "to_dict"):
+            stats = stats.to_dict()
+        namespaces = stats.get("namespaces", {})
+        snapshot["frameworks"] = [
+            {"Framework": framework, "Subject": SUBJECT_LABELS[subject],
+             "Passages": namespaces.get(framework, {}).get("vector_count", 0)}
+            for subject, framework in FRAMEWORK_BY_SUBJECT.items()
+            if namespaces.get(framework, {}).get("vector_count", 0) > 0]
+        snapshot["pinecone_checked"] = True
+    except Exception:
+        snapshot["pinecone_error"] = "Framework ingestion status is unavailable."
+        logger.exception("Namespace diagnostics failed")
+    st.session_state.source_snapshot = snapshot
+
+
 def how_this_works_screen() -> None:
-    st.header("About SchoolMate")
-    st.write("SchoolMate helps families make sense of California’s school curriculum. "
-             "Explore what children learn, discover how subjects are taught, and find earlier or next steps "
-             "without having to navigate curriculum documents on your own.")
-    st.write("The project brings together mathematics, English language arts, English language development, "
-             "science, history and social science, the arts, and physical education. "
-             "Guided setup helps you explore a subject and grade; Ask me anything lets you ask in your own words.")
-    st.write("Standards and teaching guidance come from California Department of Education source material. "
-             "Saved plain-language descriptions make standards easier to read, with official wording and sources "
-             "available for reference. Coverage varies by subject; SchoolMate identifies information that has not been loaded or published.")
-    st.subheader("How SchoolMate is built")
-    st.graphviz_chart("""digraph SchoolMate {
-        graph [rankdir=TB, bgcolor="transparent", pad="0.2", nodesep="0.4"];
-        node [shape=box, style="rounded,filled", fillcolor="#eef4ff", color="#8196b4", fontname="Arial", fontsize=16];
-        edge [color="#60748d", fontname="Arial", fontsize=12];
-        ui [label="SchoolMate · Streamlit\\nGuided setup + Ask me anything"];
-        intent [label="Question classification\\nSubject, grade and question type"];
-        sqlroute [label="Structured requests\\nFixed flow or tool-calling agent"];
-        proseroute [label="Open questions\\nFramework search + agent response"];
-        db [label="Postgres\\nStandards, progressions and achievement levels"];
-        pine [label="Pinecone\\nFramework prose by subject namespace"];
-        offline [label="Offline preparation\\nCSV loading, prose ingestion, translations and overviews"];
-        cache [label="Cached results\\nAnswers, learning areas and sources"];
-        ui -> sqlroute [label="guided choices"];
-        ui -> intent [label="question"];
-        intent -> sqlroute [label="what / next / revisit"];
-        intent -> proseroute [label="how / why"];
-        sqlroute -> db;
-        proseroute -> pine;
-        offline -> db;
-        offline -> pine;
-        db -> cache;
-        pine -> cache;
-    }""", width="stretch")
-    st.caption("Standards are queried from Postgres; framework prose is retrieved from Pinecone. "
-               "Translations and grade overviews are generated offline. Switching tabs reuses the current result.")
-    st.subheader("Explore the two approaches")
-    st.write("Both approaches use the same California curriculum information. "
-             "The fixed flow follows a set route based on your choices. "
-             "The agent uses an AI model to choose which information to look up and put together an answer.")
-    st.write("Changing the approach applies to your next See guide submission. "
-             "It does not change an open guide. Identical submissions reuse saved results. "
-             "Open questions about how or why a subject is taught always use the agent with framework teaching guidance.")
-    st.session_state.setdefault("_mode_choice", st.session_state.mode)
-    st.radio("Guide mode", ["deterministic", "agent"], key="_mode_choice", on_change=_select_mode,
-             format_func=lambda value: "Fixed flow" if value == "deterministic" else "Agent")
+    st.header("How this works")
+    st.write("California writes down what children learn at each grade, but the documents are written "
+             "for teachers and can be hard for parents to use. SchoolMate helps families find answers "
+             "in those official documents. It shows where each answer came from. When the documents "
+             "do not cover a question, it says so.")
+
+    st.subheader("Two ways of deciding")
     cards = st.columns(2)
-    for card, mode, label in zip(cards, ("deterministic", "agent"), ("Fixed flow", "Agent")):
+    for card, mode, label, explanation in zip(
+        cards, ("deterministic", "agent"), ("Fixed flow", "Agent"),
+        ("Your chosen goal maps to one tool through a lookup. No model chooses the tool.",
+         "A model reads your question and picks the tools itself."),
+    ):
         with card, st.container(border=True):
             st.subheader(label)
+            st.write(explanation)
             metrics = st.session_state.get("mode_stats", {}).get(mode)
             st.metric("Model calls", metrics["calls"] if metrics else "—")
             st.metric("Elapsed time", f"{metrics['elapsed']:.2f} s" if metrics else "—")
             cost = "—" if metrics is None else "Unknown" if metrics["cost"] is None else f"${metrics['cost']:.6f}"
             st.metric("Estimated cost", cost)
-            if metrics:
-                st.caption(f"Last submission · {metrics['tokens']} tokens")
-            else:
-                st.caption("No guide submitted with this approach in this session.")
-    st.caption("Cards show the latest submission for each approach, including time spent reading saved results. "
-               "They are not a controlled comparison unless the guide choices match. "
-               "Usage counters are process-wide, so simultaneous users can affect these estimates.")
-    extraction = st.session_state.get("extraction_usage")
-    if extraction:
-        st.caption(f"Last question review · {extraction['calls']} model calls · {extraction['tokens']} tokens")
-    st.subheader("Usage readout")
-    st.caption("Process-wide usage across all sessions; saved responses require no new provider calls.")
-    st.code(llm.usage_report(), language=None)
-    with st.expander("Database diagnostics", expanded=False):
+            st.caption("Last submission for this approach." if metrics else
+                       "No submission with this approach in this session.")
+    st.caption("Each card shows one run, not cumulative totals. Cached results can take no model calls. "
+               "Compare matching questions and settings for a fair comparison. "
+               "Free-text submissions include question classification; guided selections do not require it.")
+    st.write("The fixed flow cannot reach search_guidance: no goal maps to it. "
+             "Open questions are answerable only on the agent path.")
+    st.session_state.setdefault("_mode_choice", st.session_state.mode)
+    st.radio("Guide mode", ["deterministic", "agent"], key="_mode_choice", on_change=_select_mode,
+             format_func=lambda value: "Fixed flow" if value == "deterministic" else "Agent")
+    st.caption("Applies to your next structured guide. Open questions always use the agent.")
+
+    st.subheader("Where the answers come from")
+    st.button("Refresh source status", on_click=_refresh_sources)
+    snapshot = st.session_state.get("source_snapshot", {})
+    cabinet, bookshelf = st.columns(2)
+    with cabinet, st.container(border=True):
+        st.subheader("Filing cabinet · Postgres")
+        st.write("Standards, prerequisites and achievement levels, found through exact lookups.")
+        if snapshot.get("tables"):
+            st.dataframe([{"Table": table, "Rows": count} for table, count in snapshot["tables"].items()],
+                         hide_index=True)
+        else:
+            st.caption(snapshot.get("database_error", "Select Refresh source status to see current row counts."))
+    with bookshelf, st.container(border=True):
+        st.subheader("Bookshelf · Pinecone")
+        st.write("Framework prose, searched by meaning.")
+        if snapshot.get("frameworks"):
+            st.dataframe(snapshot["frameworks"], hide_index=True)
+        elif snapshot.get("pinecone_checked"):
+            st.info("No supported framework namespaces contain passages yet.")
+        else:
+            st.caption(snapshot.get("pinecone_error", "Select Refresh source status to see ingested frameworks."))
+    st.caption("Status is a saved snapshot from the last refresh; switching tabs does not contact either service.")
+    st.write("Standards have stable codes and structured fields. We keep them separate because searching "
+             "by meaning alone can return the wrong grade: curriculum text reads almost identically across grades.")
+
+    st.subheader("What we do not do")
+    st.markdown("""- Never assess or rank an individual child.
+- Never ask for grades, test scores or teacher feedback.
+- Never link elementary activities to college admissions.
+- Show achievement levels without a marker for the child; the parent does the comparing.
+- Say when California publishes nothing, rather than filling the gap.""")
+
+    st.subheader("A retrieval finding")
+    st.caption("Recorded observations from three example searches, not a live benchmark.")
+    st.dataframe([
+        {"Question": "How is math taught in first grade?", "Top similarity score": 0.842, "Judged relevant": "Relevant"},
+        {"Question": "Why are fractions taught before decimals?", "Top similarity score": 0.803, "Judged relevant": "Not relevant"},
+        {"Question": "Which school should I send my child to?", "Top similarity score": 0.810, "Judged relevant": "Not relevant"},
+    ], hide_index=True)
+    st.write("An entirely out-of-scope question scored higher than a plausible curriculum one, "
+             "so we replaced the similarity threshold with a model-judged relevance check.")
+
+    st.subheader("Evaluation results · Coming soon")
+    st.info("Placeholder: the four-configuration comparison table will appear here when evaluation is complete.")
+
+    with st.expander("Architecture", expanded=False):
+        st.graphviz_chart("""digraph SchoolMate {
+            graph [rankdir=TB, bgcolor="transparent", pad="0.2", nodesep="0.4"];
+            node [shape=box, style="rounded,filled", fillcolor="#eef4ff", color="#8196b4", fontname="Arial", fontsize=16];
+            edge [color="#60748d", fontname="Arial", fontsize=12];
+            ui [label="SchoolMate · Streamlit\\nGuided setup + Ask me anything"];
+            intent [label="Question classification\\nSubject, grade and question type"];
+            sqlroute [label="Structured requests\\nFixed flow or tool-calling agent"];
+            proseroute [label="Open questions\\nFramework search + agent response"];
+            db [label="Postgres\\nStandards, progressions and achievement levels"];
+            pine [label="Pinecone\\nFramework prose by subject namespace"];
+            offline [label="Offline preparation\\nCSV loading, prose ingestion, translations and overviews"];
+            cache [label="Cached results\\nAnswers, learning areas and sources"];
+            ui -> sqlroute [label="guided choices"];
+            ui -> intent [label="question"];
+            intent -> sqlroute [label="what / next / revisit"];
+            intent -> proseroute [label="how / why"];
+            sqlroute -> db;
+            proseroute -> pine;
+            offline -> db;
+            offline -> pine;
+            db -> cache;
+            pine -> cache;
+        }""", width="stretch")
+
+    with st.expander("Diagnostics", expanded=False):
+        st.caption("Process-wide usage totals across sessions; these are separate from the per-run cards.")
+        st.code(llm.usage_report(), language=None)
+        if st.session_state.get("extraction_usage"):
+            st.write({"Last question classification": st.session_state.extraction_usage})
         if st.button("Refresh diagnostics"):
             database_diagnostics.clear()
             st.session_state.diagnostics = database_diagnostics()
@@ -710,9 +785,8 @@ def how_this_works_screen() -> None:
                 st.error(diagnostics["error"])
             else:
                 st.dataframe(diagnostics["rows"], hide_index=True)
-        st.caption("Cached snapshot; refresh after loading data or changing the database.")
-    if st.session_state.get("last_error_detail"):
-        with st.expander("Latest error details"):
+        if st.session_state.get("last_error_detail"):
+            st.caption("Latest error details")
             st.code(st.session_state.last_error_detail, language=None)
 
 

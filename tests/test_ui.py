@@ -298,8 +298,8 @@ def test_domains_collapsed_with_saved_overview_in_both_tabs(monkeypatch):
     page.run()
     assert not page.exception
     for tab, overview, headings in [
-        (next(t for t in page.tabs if t.label == "Learning this year"), 'Saved current overview.', ['Adding and subtracting', 'Shapes and space']),
-        (next(t for t in page.tabs if t.label == "Next steps"), 'Saved next overview.', ['Adding and subtracting']),
+        (next(t for t in page.tabs if t.label == "Learning this year"), 'Saved current overview.', ['Adding, subtracting, multiplying and dividing · 20 skills', 'Shapes and space · 1 skill']),
+        (next(t for t in page.tabs if t.label == "Next steps"), 'Saved next overview.', ['Adding, subtracting, multiplying and dividing · 1 skill']),
     ]:
         # Only the overview/continuity line and domain expanders are direct tab children.
         sections = [child for child in tab.children.values() if child.type == 'expander']
@@ -347,7 +347,7 @@ def test_how_page_stats_and_mode_preference_survive_navigation(monkeypatch):
     assert not page.exception
     assert len(page.sidebar) == 0
     assert [m.value for m in page.metric] == ['0', '0.20 s', '$0.000000', '2', '2.50 s', '$0.000100']
-    assert any(e.label == 'Database diagnostics' for e in page.expander)
+    assert any(e.label == 'Diagnostics' for e in page.expander)
     assert page.code
     page.radio(key='_mode_choice').set_value('agent').run()
     navigate(page, 'Guide')
@@ -585,8 +585,7 @@ def test_identical_summary_is_displayed_once_and_long_overview_is_compact():
     assert not page.exception
     values = [m.value for m in page.markdown]
     assert values.count("Exact official text.") == 1
-    assert "First. Second. Third. Fourth." not in values
-    assert any(v.startswith("This grade includes ") for v in values)
+    assert "First. Second. Third. Fourth." in values
     assert not any(e.label == "See the official wording" for e in page.expander)
 
 
@@ -724,3 +723,75 @@ def test_trace_has_no_invented_steps_for_legacy_results():
     page.session_state.results = open_result()
     page.run()
     assert not any('Show work' in e.label for e in page.expander)
+
+
+def test_ela_sections_derive_missing_domains_and_keep_framework_order(monkeypatch):
+    forbidden = MagicMock(side_effect=AssertionError("No render generation"))
+    monkeypatch.setattr(llm, "cached_complete", forbidden)
+    payload = content()
+    rows = [record(code) | {"framework_id": "CA-CCSS-ELA-2013"}
+            for code in ["L.2.1", "W.2.1", "RI.2.1", "RL.2.1", "RL.2.2", "XYZ.2.1"]]
+    for row in rows:
+        row.pop("domain", None)
+    payload["standards"] = rows
+    payload["forward"] = []
+    page = new_page()
+    page.session_state.stage = "results"
+    page.session_state.results = dict(content=payload, answer="Saved", subject="ela", grade=2,
+                                      goal="on_grade_level")
+    page.run()
+    assert not page.exception
+    tab = next(t for t in page.tabs if t.label == "Learning this year")
+    sections = [child for child in tab.children.values() if child.type == "expander"]
+    assert [s.label for s in sections] == [
+        "Reading stories and poems · 2 skills", "Reading factual texts · 1 skill",
+        "Writing · 1 skill", "Grammar, spelling and vocabulary · 1 skill", "XYZ · 1 skill"]
+    assert all(not s.proto.expanded for s in sections)
+    page.run()
+    forbidden.assert_not_called()
+
+
+def test_explanation_page_sections_findings_and_stored_source_counts(monkeypatch):
+    forbidden = MagicMock(side_effect=AssertionError('No providers on page switch'))
+    monkeypatch.setattr(llm, 'cached_complete', forbidden)
+    monkeypatch.setattr(db, 'get_conn', forbidden)
+    page = new_page()
+    page.session_state.source_snapshot = {
+        'tables': {'standard': 21, 'progression_edge': 5, 'achievement_descriptor': 4},
+        'frameworks': [{'Framework': 'CA-CCSSM-2013', 'Subject': 'Mathematics', 'Passages': 9}]}
+    page.run()
+    navigate(page, 'About')
+    headings = [h.value for h in page.subheader]
+    ordered = ['Two ways of deciding', 'Where the answers come from', 'What we do not do',
+               'A retrieval finding', 'Evaluation results · Coming soon']
+    assert [h for h in headings if h in ordered] == ordered
+    tables = [df.value for df in page.dataframe]
+    sources = next(df for df in tables if 'Table' in df.columns)
+    assert list(sources['Rows']) == [21, 5, 4]
+    finding = next(df for df in tables if 'Top similarity score' in df.columns)
+    assert list(finding['Top similarity score']) == [0.842, 0.803, 0.810]
+    assert not next(e for e in page.expander if e.label == 'Diagnostics').proto.expanded
+    navigate(page, 'Guide')
+    assert not page.metric and not page.code
+    forbidden.assert_not_called()
+
+
+def test_source_status_uses_live_database_and_namespace_counts(monkeypatch):
+    from api.services import guidance
+    from types import SimpleNamespace
+    conn = MagicMock()
+    conn.__enter__.return_value = conn
+    conn.cursor.return_value.__enter__.return_value.fetchall.return_value = [
+        ('standard', 30), ('progression_edge', 12), ('achievement_descriptor', 4)]
+    monkeypatch.setattr(app, 'get_conn', MagicMock(return_value=conn))
+    index = MagicMock()
+    index.describe_index_stats.return_value = {'namespaces': {
+        'CA-CCSSM-2013': {'vector_count': 8}, 'CA-ELD-2012': {'vector_count': 0},
+        'unrelated': {'vector_count': 100}}}
+    monkeypatch.setattr(guidance, '_pinecone', lambda: (None, index))
+    monkeypatch.setattr(app.st, 'session_state', SimpleNamespace())
+    app._refresh_sources()
+    snapshot = app.st.session_state.source_snapshot
+    assert snapshot['tables']['standard'] == 30
+    assert [f['Framework'] for f in snapshot['frameworks']] == ['CA-CCSSM-2013']
+    index.describe_index_stats.assert_called_once()

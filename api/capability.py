@@ -45,7 +45,7 @@ def supports(subject: str, tab: str, grade: int | None = None) -> bool:
 
 
 # Parent-facing heading and one-line description for each stored domain.
-DOMAIN_LABELS: dict[str, tuple[str, str]] = {
+_DOMAIN_DETAILS: dict[str, tuple[str, str]] = {
     "CC": ("Counting", "Naming numbers and counting objects."),
     "OA": ("Adding and subtracting", "Putting amounts together, taking them apart, and noticing number patterns."),
     "NBT": ("Understanding numbers", "Understanding how digits represent amounts and using numbers in calculations."),
@@ -82,11 +82,56 @@ for _code, _name in {
     "NBT": "Number and Operations in Base Ten", "NF": "Number and Operations—Fractions",
     "G": "Geometry", "MD": "Measurement and Data",
 }.items():
-    DOMAIN_LABELS[_name] = DOMAIN_LABELS[_code]
+    _DOMAIN_DETAILS[_name] = _DOMAIN_DETAILS[_code]
 
 
-def domain_label(domain: str, grade: int) -> tuple[str, str]:
-    if domain in {"OA", "Operations and Algebraic Thinking"} and grade >= 3:
-        return ("Calculating and finding patterns",
-                "Exploring multiplication, division, and patterns in numbers.")
-    return DOMAIN_LABELS.get(domain, ("More learning", "Explore the learning described in this area."))
+# Insertion order follows the domains in each source framework.
+DOMAIN_LABELS: dict[str, dict[str, str]] = {
+    "CA-CCSSM-2013": {
+        "CC": "Counting", "OA": "Adding, subtracting, multiplying and dividing",
+        "NBT": "Understanding place value", "NF": "Working with fractions",
+        "MD": "Measuring things", "G": "Shapes and space",
+    },
+    "CA-CCSS-ELA-2013": {
+        "RL": "Reading stories and poems", "RI": "Reading factual texts",
+        "RF": "Sounding out and reading fluently", "W": "Writing",
+        "SL": "Speaking and listening", "L": "Grammar, spelling and vocabulary",
+    },
+}
+_DOMAIN_ALIASES = {
+    "CA-CCSSM-2013": dict(zip(
+        ["Counting and Cardinality", "Operations and Algebraic Thinking",
+         "Number and Operations in Base Ten", "Number and Operations—Fractions",
+         "Measurement and Data", "Geometry"], ["CC", "OA", "NBT", "NF", "MD", "G"])),
+    "CA-CCSS-ELA-2013": dict(zip(
+        ["Reading: Literature", "Reading: Informational Text", "Reading: Foundational Skills",
+         "Writing", "Speaking and Listening", "Language"], ["RL", "RI", "RF", "W", "SL", "L"])),
+}
+
+
+def standard_domain(framework: str, domain: str | None, code: str = "") -> str:
+    """Normalize stored names, deriving a missing domain from the standard code."""
+    if domain and domain.strip():
+        value = domain.strip()
+        return _DOMAIN_ALIASES.get(framework, {}).get(value, value)
+    parts = code.split(".")
+    if framework == "CA-CCSSM-2013" and len(parts) > 1:
+        return parts[1]
+    if framework == "CA-CCSS-ELA-2013" and parts[0]:
+        return parts[0]
+    return code or "Unspecified"
+
+
+def ordered_domains(framework: str, domains: list[str]) -> list[str]:
+    """Known source order first; preserve input order for unmapped domains."""
+    unique = list(dict.fromkeys(domains))
+    return [d for d in DOMAIN_LABELS.get(framework, {}) if d in unique] + [
+        d for d in unique if d not in DOMAIN_LABELS.get(framework, {})]
+
+
+def domain_label(domain: str, grade: int, framework: str = "") -> tuple[str, str]:
+    code = standard_domain(framework, domain)
+    raw = next((name for name, alias in _DOMAIN_ALIASES.get(framework, {}).items()
+                if alias == code), code)
+    detail = _DOMAIN_DETAILS.get(raw, _DOMAIN_DETAILS.get(code, (code, "")))
+    return DOMAIN_LABELS.get(framework, {}).get(code, detail[0]), detail[1]

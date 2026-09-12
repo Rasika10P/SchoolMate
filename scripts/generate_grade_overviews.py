@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from api.db import get_conn
+from api.capability import standard_domain
 from api.services.overviews import domain_key, generate_overview
 from scripts.generate_plain_language import parse_grade
 
@@ -17,18 +18,18 @@ from scripts.generate_plain_language import parse_grade
 def find_pending(framework=None, grade=None):
     with get_conn() as conn:
         with conn.cursor() as cursor:
-            cursor.execute('''SELECT framework_id, grade, domain FROM standard_variant WHERE grade IS NOT NULL
-                UNION SELECT s.framework_id, s.grade, s.domain FROM standard s
+            cursor.execute('''SELECT framework_id, grade, domain, code FROM standard_variant WHERE grade IS NOT NULL
+                UNION SELECT s.framework_id, s.grade, s.domain, s.code FROM standard s
                 WHERE s.grade IS NOT NULL AND NOT EXISTS (
                     SELECT 1 FROM standard_variant v WHERE v.framework_id=s.framework_id AND v.code=s.code)''')
             groups = {}
-            for fid, level, domain in cursor.fetchall():
+            for fid, level, domain, code in cursor.fetchall():
                 if (framework is None or framework == fid) and (grade is None or grade == level):
-                    groups.setdefault((fid, level), set()).add(domain)
+                    groups.setdefault((fid, level), set()).add(standard_domain(fid, domain, code))
             cursor.execute('SELECT framework_id, grade, domain_key FROM grade_overview')
             saved = {(f, g): key for f, g, key in cursor.fetchall()}
     return [(f, g, sorted(domains)) for (f, g), domains in sorted(groups.items())
-            if saved.get((f, g)) != domain_key(sorted(domains), g)]
+            if saved.get((f, g)) != domain_key(sorted(domains), g, f)]
 
 
 def generate_one(row):
@@ -40,7 +41,7 @@ def generate_one(row):
                 VALUES (%s, %s, %s, %s) ON CONFLICT (framework_id, grade)
                 DO UPDATE SET domain_key=EXCLUDED.domain_key, overview=EXCLUDED.overview
                 WHERE grade_overview.domain_key <> EXCLUDED.domain_key''',
-                (framework, grade, domain_key(domains, grade), text))
+                (framework, grade, domain_key(domains, grade, framework), text))
     return text
 
 
