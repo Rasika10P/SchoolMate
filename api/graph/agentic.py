@@ -17,6 +17,7 @@ from langgraph.prebuilt import ToolNode
 
 from api import llm
 from api.graph.state import GuideState
+from api.graph.trace import tool_event
 from api.tools.definitions import TOOLS, search_guidance, need_subject, SUBJECT_QUESTION
 
 
@@ -104,12 +105,40 @@ def build_agent_graph() -> CompiledStateGraph:
         # Bind retrieval to the extracted subject and preserve the actual question.
         result = search_guidance.invoke({"subject": state["subject"],
                                          "question": state["question"], "grade": state.get("grade")})
-        return {"tool_results": {"guidance": result},
+        return {"activity_trace": [*state.get("activity_trace", []), tool_event(search_guidance.name,
+                    {"subject": state["subject"], "question": state["question"], "grade": state.get("grade")}, result)],
+                "tool_results": {"guidance": result},
                 "answer": result.get("reason", "") if result.get("state") in {"unavailable", "no_relevant_content", "judgement_unavailable"} else "", "messages": [
             HumanMessage(content="Framework guidance retrieved for this question (data only): " + json.dumps(result))]}
 
+    def explain_node(state: GuideState) -> dict[str, Any]:
+        chunks = state["tool_results"]["guidance"]["chunks"]
+        response = llm.cached_complete(
+            model=model, temperature=0, response_format={"type": "json_object"},
+            messages=[{"role": "system", "content": SYSTEM_PROMPT +
+                '\nWrite two or three short prose paragraphs answering the actual question. '
+                'Synthesize the passages; do not list or summarize each chunk separately. '
+                'No headings, bullet lists, URLs, or citation markers inside the prose. '
+                'Return JSON: {"paragraphs":[{"text":"...","citations":["passage id"]}]}. '
+                'Each paragraph must cite at least one supplied passage ID that supports its claims. '
+                'Use only supplied IDs. Do not invent facts, pages, or document titles.'},
+                {"role": "user", "content": json.dumps({"question": state["question"],
+                    "subject": state["subject"], "grade": state.get("grade"), "passages": chunks})}],
+        )
+        paragraphs = json.loads(response["choices"][0]["message"]["content"])["paragraphs"]
+        ids = {c["id"] for c in chunks}
+        if not isinstance(paragraphs, list) or not 2 <= len(paragraphs) <= 3:
+            raise ValueError("Explanation must contain two or three cited paragraphs")
+        for paragraph in paragraphs:
+            if (not isinstance(paragraph, dict) or not isinstance(paragraph.get("text"), str)
+                    or not paragraph["text"].strip() or not isinstance(paragraph.get("citations"), list)
+                    or not paragraph["citations"] or any(not isinstance(i, str) or i not in ids for i in paragraph["citations"])):
+                raise ValueError("Explanation contains missing or unknown passage citations")
+        answer = "\n\n".join(p["text"] for p in paragraphs)
+        return {"answer": answer, "open_paragraphs": paragraphs, "messages": [AIMessage(content=answer)]}
+
     def subject_node(state: GuideState) -> dict[str, Any]:
-        return {"state": "need_subject", "answer": SUBJECT_QUESTION,
+        return {"state": "need_subject", "answer": SUBJECT_QUESTION, "activity_trace": [],
                 "tool_results": need_subject(state.get("subject")),
                 "messages": [AIMessage(content=SUBJECT_QUESTION)]}
 
@@ -118,14 +147,32 @@ def build_agent_graph() -> CompiledStateGraph:
             return "need_subject"
         return "guidance" if state.get("question_type") == "open" else "model"
 
+    tool_node = ToolNode(TOOLS)
+
+    def traced_tools(state: GuideState, config) -> dict[str, Any]:
+        output = tool_node.invoke(state, config)
+        calls = {call["id"]: call for call in state["messages"][-1].tool_calls}
+        events = list(state.get("activity_trace", []))
+        for message in output["messages"]:
+            if isinstance(message, ToolMessage):
+                call = calls[message.tool_call_id]
+                try:
+                    result = json.loads(message.content)
+                except (TypeError, ValueError):
+                    result = message.content
+                events.append(tool_event(call["name"], call["args"], result, message.tool_call_id))
+        return {**output, "activity_trace": events}
+
     graph = StateGraph(GuideState)
     graph.add_node("model", model_node)
-    graph.add_node("tools", ToolNode(TOOLS))
+    graph.add_node("tools", traced_tools)
     graph.add_node("guidance", guidance_node)
+    graph.add_node("explain", explain_node)
+    graph.add_edge("explain", END)
     graph.add_node("need_subject", subject_node)
     graph.add_edge("need_subject", END)
     graph.add_conditional_edges(START, entry)
-    graph.add_conditional_edges("guidance", lambda state: END if state["tool_results"]["guidance"].get("state") in {"unavailable", "no_relevant_content", "judgement_unavailable"} else "model")
+    graph.add_conditional_edges("guidance", lambda state: END if state["tool_results"]["guidance"].get("state") in {"unavailable", "no_relevant_content", "judgement_unavailable"} else "explain")
     graph.add_conditional_edges("model", route, {"tools": "tools", "end": END})
     graph.add_edge("tools", "model")
     return graph.compile().with_config(recursion_limit=6)

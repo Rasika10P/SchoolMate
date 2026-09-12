@@ -77,8 +77,8 @@ def test_results_reruns_only_read_saved_data(monkeypatch: pytest.MonkeyPatch) ->
                                       subject="hss", grade=4, domain=None, goal="catching_up", mode="deterministic")
     page.run()
     assert not page.exception
-    assert [tab.label for tab in page.tabs if tab.label not in ("Guide", "About")] == ["Guided setup", "Ask me anything", "Learning this year", "Skills to revisit", "Activities", "Outside programmes"]
-    assert not any(tab.label == "Standing" for tab in page.tabs)
+    assert [tab.label for tab in page.tabs if tab.label not in ("Guide", "About")] == ["Guided setup", "Ask me anything", "Learning this year", "Skills to revisit", "Standing", "Activities", "Outside programmes"]
+    assert any(tab.label == "Standing" for tab in page.tabs)
     navigate(page, 'About')
     page.radio(key="_mode_choice").set_value("agent").run()
     navigate(page, 'Guide')
@@ -588,3 +588,139 @@ def test_identical_summary_is_displayed_once_and_long_overview_is_compact():
     assert "First. Second. Third. Fourth." not in values
     assert any(v.startswith("This grade includes ") for v in values)
     assert not any(e.label == "See the official wording" for e in page.expander)
+
+
+
+def open_result(status="available"):
+    chunks = [{"id": "one", "text": "Exact passage one.", "metadata": {
+        "document_title": "California Mathematics Framework", "page": 14, "page_end": 15,
+        "source_url": "https://example.org/framework.pdf"}},
+        {"id": "two", "text": "Exact passage two.", "metadata": {
+        "document_title": "California Mathematics Framework", "page": None}}]
+    return dict(question_type="open", subject="math", grade=1, content=None,
+        intent=dict(raw="  how is math taught in first grade  ", subject="math", grade=1,
+                    question_type="open", evidence={"subject": "from math", "grade": "from first grade"}),
+        answer="Saved explanation", open_paragraphs=[
+            {"text": "Children explore mathematical ideas.", "citations": ["one"]},
+            {"text": "They discuss what they notice.", "citations": ["two"]}],
+        tool_results={"guidance": {"state": status, "reason": "No passages answer this question.",
+                                   "chunks": chunks if status == "available" else []}})
+
+
+def test_open_explanation_citations_navigation_and_full_guide(monkeypatch):
+    forbidden = MagicMock(side_effect=AssertionError("No generation or database work on rerun"))
+    monkeypatch.setattr(llm, "cached_complete", forbidden)
+    monkeypatch.setattr(db, "get_conn", forbidden)
+    page = new_page()
+    page.session_state.stage = "results"
+    page.session_state.results = open_result()
+    page.run()
+    assert not page.exception
+    assert 'How is math taught in first grade' in [h.value for h in page.subheader]
+    assert not any(t.label in ('Learning this year', 'Next steps', 'Standing') for t in page.tabs)
+    citation = next(e for e in page.expander if e.label.endswith('pp. 14–15'))
+    assert 'Exact passage one.' in [m.value for m in citation.markdown]
+    assert any(e.label == 'California Mathematics Framework' for e in page.expander)
+    raw = next(e for e in page.expander if e.label.startswith('Based on 2 passages'))
+    assert not raw.proto.expanded
+    assert not any('Page not recorded' in m.value for m in page.markdown)
+    assert len(page.get('popover')) == 2
+    page.run()
+    navigate(page, 'About')
+    navigate(page, 'Guide')
+    next(b for b in page.button if 'See the full guide' in b.label).click().run()
+    assert not page.exception
+    assert page.session_state.stage == 'entry'
+    assert page.selectbox(key='guide_subject').value == 'math'
+    assert page.selectbox(key='guide_grade').value == 1
+    forbidden.assert_not_called()
+
+
+@pytest.mark.parametrize('status,kind', [('no_relevant_content','info'), ('unavailable','error'), ('judgement_unavailable','error')])
+def test_open_nonanswer_states_never_show_synthesis(monkeypatch, status, kind):
+    forbidden = MagicMock(side_effect=AssertionError('No model on render'))
+    monkeypatch.setattr(llm, 'cached_complete', forbidden)
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = open_result(status)
+    page.run()
+    assert not page.exception
+    assert 'No passages answer this question.' in [e.value for e in getattr(page, kind)]
+    assert 'Children explore mathematical ideas.' not in [m.value for m in page.markdown]
+    if status == 'no_relevant_content':
+        assert not page.error
+        assert any('Guided setup' in b.label for b in page.button)
+    forbidden.assert_not_called()
+
+
+def test_open_change_regenerates_only_on_edit(monkeypatch):
+    app.st.cache_data.clear()
+    graph = MagicMock()
+    graph.invoke.return_value = {'answer': 'New explanation.', 'tool_results': {}}
+    monkeypatch.setattr(agentic, 'build_agent_graph', lambda: graph)
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = open_result()
+    page.run()
+    graph.invoke.assert_not_called()
+    page.selectbox(key='open_subject').set_value('ela').run()
+    assert not page.exception
+    assert page.session_state.results['subject'] == 'ela'
+    assert graph.invoke.call_args.args[0]['question'].strip() == 'how is math taught in first grade'
+    page.run()
+    graph.invoke.assert_called_once()
+
+
+def test_standing_cites_shared_source_once_below_levels():
+    payload = content()
+    payload['standing'] = [dict(framework_id='CA-CCSSM-2013', grade=4, subject='mathematics',
+        level=n, text=f'Published description {n}.', source_url='https://example.org/ald.pdf',
+        page=14 if n < 3 else 15) for n in range(1, 5)]
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = dict(content=payload, answer='Saved', subject='math', grade=4, goal='on_grade_level')
+    page.run()
+    assert not page.exception
+    standing = next(t for t in page.tabs if t.label == 'Standing')
+    texts = [m.value for m in standing.markdown]
+    assert all(f'Published description {n}.' in texts for n in range(1, 5))
+    links = [v for v in texts if '(https://example.org/ald.pdf)' in v]
+    assert len(links) == 1 and links[0].endswith('Pages 14–15')
+    assert texts.index(links[0]) > texts.index('Published description 4.')
+
+
+
+def test_activity_trace_uses_only_recorded_calls_and_no_rerun_work(monkeypatch):
+    from api.graph.trace import tool_event
+    forbidden = MagicMock(side_effect=AssertionError('Trace viewing must not execute anything'))
+    monkeypatch.setattr(llm, 'cached_complete', forbidden)
+    monkeypatch.setattr(db, 'get_conn', forbidden)
+    result = open_result()
+    result['activity_trace'] = [
+        tool_event('on_grade_level', {'subject': 'math', 'grade': 1}, {
+            'standards': [record(), record('1.CC.2', 1)], 'achievement_levels': []}),
+        tool_event('search_guidance', {}, {'state': 'no_relevant_content', 'reason': 'Passages do not answer the question.'})]
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = result
+    page.run()
+    assert not page.exception
+    trace = next(e for e in page.expander if 'Show work' in e.label)
+    assert trace.label == 'Checked 1 sources · 2 steps · Show work'
+    assert not trace.proto.expanded
+    lines = [m.value for m in trace.markdown]
+    assert any('found 2 standards across 1 areas' in line for line in lines)
+    assert any('no achievement descriptions returned' in line for line in lines)
+    assert any('Passages do not answer the question.' in line for line in lines)
+    page.run()
+    navigate(page, 'About')
+    navigate(page, 'Guide')
+    forbidden.assert_not_called()
+
+
+def test_trace_has_no_invented_steps_for_legacy_results():
+    page = new_page()
+    page.session_state.stage = 'results'
+    page.session_state.results = open_result()
+    page.run()
+    assert not any('Show work' in e.label for e in page.expander)

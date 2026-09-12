@@ -1,8 +1,7 @@
 The subject CSVs contain California curriculum standards. `maths.csv` also
 retains three illustrative records. `progression.csv` contains reviewed progression
-links. `ald.csv` currently contains only its header: the three illustrative
-achievement descriptors have been removed. No official achievement descriptions
-are currently loaded.
+links. `ald.csv` contains achievement descriptions with nullable `source_url` and
+`page` columns. The earlier illustrative descriptors have been removed.
 Blank `page` means SQL NULL.
 
 To append standards copied from a PDF, run from the project root with your source
@@ -199,3 +198,11 @@ These are prompt instructions, not a claim of application-wide data redaction.
 The loader preserves existing database rows on conflict. Deleting records from
 `ald.csv` does not delete previously loaded database records; the three exact
 illustrative descriptors were removed separately from Postgres.
+
+
+Achievement descriptor CSV headers are:
+`framework_id,grade,subject,level,text,source_url,page`. Empty source URLs and
+pages load as NULL; populated pages must be integers. Subject names match the
+framework catalog. Migration `003_achievement_descriptor_sources.sql` adds the
+source columns to existing tables without deleting records. Standing displays
+available levels and deduplicates citations by source URL beneath them.

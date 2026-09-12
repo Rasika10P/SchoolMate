@@ -14,6 +14,8 @@ class GuideState(TypedDict):
     goal: str | None
     question_type: NotRequired[str]
     question: NotRequired[str]
+    activity_trace: NotRequired[list[dict[str, Any]]]
     tool_results: dict[str, Any]
+    open_paragraphs: NotRequired[list[dict[str, Any]]]
     answer: str
     messages: Annotated[list[AnyMessage], add_messages]

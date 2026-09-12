@@ -14,7 +14,7 @@ def get_achievement_levels(
     """Return grade descriptors for the framework's subject, ordered by level."""
     with conn.cursor(row_factory=tuple_row) as cursor:
         cursor.execute(
-            """SELECT a.framework_id, a.grade, a.subject, a.level, a.text
+            """SELECT a.framework_id, a.grade, a.subject, a.level, a.text, a.source_url, a.page
                FROM achievement_descriptor a
                JOIN framework f ON f.id = a.framework_id AND f.subject = a.subject
                WHERE a.framework_id = %s AND a.grade = %s

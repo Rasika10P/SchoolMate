@@ -26,6 +26,7 @@ from api.graph.agentic import build_agent_graph
 from api.graph.deterministic import build_deterministic_graph
 from api.graph.extractor import extract_intent
 from api.graph.state import GuideState
+from api.graph.trace import describe_event, source_urls
 from api.services.progression import walk
 from api.services.overviews import get_overviews
 from api.services.standards import get_achievement_levels, get_standards
@@ -87,7 +88,7 @@ def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode
     content = None if goal == "competition_prep" else _hydrate(subject, grade, domain)
     tab = "standing" if goal == "on_grade_level" else "next_steps"
     if goal != "competition_prep" and supports(subject, tab, grade) and content.get("data_state") == "not_loaded":
-        return {"content": content, "answer": content["data_reason"],
+        return {"content": content, "answer": content["data_reason"], "activity_trace": [],
                 "tool_results": {"state": "not_loaded", "reason": content["data_reason"]},
                 "subject": subject, "grade": grade, "domain": domain, "goal": goal, "mode": mode}
     graph = build_deterministic_graph() if mode == "deterministic" else build_agent_graph()
@@ -95,6 +96,7 @@ def generate_guide(subject: str, grade: int, domain: str | None, goal: str, mode
                        tool_results={}, answer="", messages=[])
     result = graph.invoke(state)
     return {"content": content, "answer": result["answer"], "tool_results": result["tool_results"],
+            "activity_trace": result.get("activity_trace", []),
             "subject": subject, "grade": grade, "domain": domain, "goal": goal, "mode": mode}
 
 
@@ -213,6 +215,8 @@ def entry_screen() -> None:
             if not question.strip():
                 st.warning("Please enter a question first.")
                 return
+            for field in ("subject", "grade"):
+                st.session_state.pop(f"open_{field}", None)
             _begin_submission()
             before, started = _usage_snapshot(), perf_counter()
             try:
@@ -229,7 +233,7 @@ def entry_screen() -> None:
 
 @st.cache_data(show_spinner=False)
 def generate_open_answer(question: str, subject: str, grade: int | None) -> dict[str, Any]:
-    """Question-aware cache, separate from the five-key structured guide cache."""
+    """Cited explanation cache v2; synthesis runs only on explicit submission."""
     return build_agent_graph().invoke(GuideState(
         subject=subject, grade=grade, domain=None, goal=None, question=question,
         question_type="open", messages=[], tool_results={}, answer=""))
@@ -267,6 +271,7 @@ def _submit_question(intent: dict[str, Any], *, rerun: bool = True) -> None:
         except Exception as exc:
             _show_failure(exc)
             result["answer"] = "We couldn’t prepare your answer. Please try again shortly."
+            result["explanation_error"] = True
         finally:
             _record_usage(before, started, mode)
     st.session_state.active_entry = "Ask me anything"
@@ -404,9 +409,126 @@ def _refresh_translations(content: dict[str, Any]) -> None:
         record.update(plain_summary=summary, plain_example=example)
 
 
+def _open_intent(result):
+    return _normalize_intent(result.get("intent") or {
+        "subject": result.get("subject"), "grade": result.get("grade"),
+        "question_type": "open", "raw": result.get("question", ""), "evidence": {}})
+
+
+def _open_change(field):
+    intent = _open_intent(st.session_state.results)
+    intent[field] = st.session_state[f"open_{field}"]
+    intent["evidence"][field] = "Chosen by you"
+    _submit_question(intent, rerun=False)
+
+
+def _full_guide():
+    result = st.session_state.results
+    st.session_state.draft = dict(subject=result.get("subject"), grade=result.get("grade"),
+                                  goal="on_grade_level", learner="No", domain="")
+    for field in ("subject", "grade", "goal"):
+        st.session_state[f"guide_{field}"] = st.session_state.draft[field]
+    st.session_state.active_entry = "Guided setup"
+    st.session_state.entry_tabs = "Guided setup"
+    st.session_state.stage = "entry"
+
+
+def _passage_label(chunk):
+    metadata = chunk.get("metadata", {})
+    title = metadata.get("document_title") or "Curriculum framework"
+    page, end = metadata.get("page"), metadata.get("page_end")
+    if page is not None:
+        title += f", pp. {page}–{end}" if end is not None and end != page else f", p. {page}"
+    return title
+
+
+def _show_passage(chunk):
+    st.write(chunk["text"])
+    url = chunk.get("metadata", {}).get("source_url")
+    if url:
+        st.markdown(f"[Open source document]({url})")
+
+
+def open_results_screen(result):
+    intent = _open_intent(result)
+    question = " ".join(intent.get("raw", "").split())
+    question = question[:1].upper() + question[1:]
+    st.subheader(question or "Explore the curriculum")
+    retrieval = result.get("tool_results", {}).get("guidance", {})
+    status = retrieval.get("state")
+    chunks = retrieval.get("chunks", [])
+    if status == "no_relevant_content":
+        st.info(retrieval["reason"], icon="ℹ️")
+    elif status in {"unavailable", "judgement_unavailable"} or result.get("explanation_error"):
+        st.error(retrieval.get("reason") or result["answer"])
+    elif not result.get("subject"):
+        st.info("Which subject did you have in mind?")
+    elif result.get("open_paragraphs"):
+        by_id = {chunk["id"]: chunk for chunk in chunks}
+        for paragraph in result["open_paragraphs"]:
+            st.write(paragraph["text"])
+            for identity in dict.fromkeys(paragraph["citations"]):
+                with st.expander(_passage_label(by_id[identity]), expanded=False):
+                    _show_passage(by_id[identity])
+    elif result.get("answer"):
+        # Older saved sessions remain readable; no synthesis on rerun.
+        st.write(result["answer"])
+
+    st.caption("What I understood")
+    fields = ["subject"] + (["grade"] if intent.get("grade") is not None else [])
+    for field in fields:
+        value = intent.get(field)
+        label = SUBJECT_LABELS.get(value, "Not mentioned") if field == "subject" else grade_label(value)
+        name, content, evidence, action = st.columns([1, 2, 3, 1])
+        name.write(field.title())
+        content.write(label)
+        evidence.write(intent.get("evidence", {}).get(field) or ("Not mentioned" if value is None else "From your question"))
+        with action:
+            with st.popover("Change" if value is not None else "Add"):
+                options = list(SUBJECT_LABELS) if field == "subject" else list(range(6))
+                key = f"open_{field}"
+                st.session_state.setdefault(key, value)
+                st.selectbox(field.title(), options, index=None, key=key,
+                    format_func=SUBJECT_LABELS.get if field == "subject" else grade_label,
+                    on_change=_open_change, args=(field,))
+    if status == "no_relevant_content":
+        followup = "Explore this subject with Guided setup"
+    elif result.get("grade") is not None and result.get("subject"):
+        year = {0: "kindergarteners", 1: "first graders", 2: "second graders", 3: "third graders", 4: "fourth graders", 5: "fifth graders"}.get(result["grade"], "children")
+        followup = f"Want to see what {year} actually learn in {SUBJECT_LABELS[result['subject']].lower()}? See the full guide"
+    else:
+        followup = "Want to explore learning by grade? See the full guide"
+    st.button(followup, type="tertiary", on_click=_full_guide)
+    if chunks:
+        titles = list(dict.fromkeys(c.get("metadata", {}).get("document_title") or "Curriculum framework" for c in chunks))
+        with st.expander(f"Based on {len(chunks)} passages from {', '.join(titles)}", expanded=False):
+            for chunk in chunks:
+                st.caption(_passage_label(chunk))
+                _show_passage(chunk)
+
+
+def _activity_trace(result):
+    events = result.get("activity_trace")
+    if events is None:
+        # Older cached results have no execution record; never reconstruct guesses.
+        return
+    sources = set()
+    for event in events:
+        sources.update(source_urls(event["result"]))
+    with st.expander(f"Checked {len(sources)} sources · {len(events)} steps · Show work", expanded=False):
+        st.caption("Recorded tool calls from this result. Sources count distinct source URLs returned by those tools; internal model calls and page rendering are not counted.")
+        if not events:
+            st.write("No tool calls were made for this result.")
+        for number, event in enumerate(events, 1):
+            st.write(f"{number}. {describe_event(event)}")
+
+
 def results_screen() -> None:
     result = st.session_state.results
-    if result.get("question_type") == "open" or result.get("content") is None:
+    if result.get("question_type") == "open":
+        open_results_screen(result)
+        return
+    if result.get("content") is None:
         st.divider()
         if result.get("answer"):
             st.write(result["answer"])
@@ -435,8 +557,8 @@ def results_screen() -> None:
     with st.expander("Answer for your selected goal"):
         st.write(result["answer"])
     catching_up = result.get("goal") == "catching_up"
-    tabs = st.tabs(["Learning this year", "Skills to revisit" if catching_up else "Next steps", "Activities", "Outside programmes"])
-    for tab, key in zip(tabs, ("standards", "next_steps", "activities", "programs")):
+    tabs = st.tabs(["Learning this year", "Skills to revisit" if catching_up else "Next steps", "Standing", "Activities", "Outside programmes"])
+    for tab, key in zip(tabs, ("standards", "next_steps", "standing", "activities", "programs")):
         with tab:
             supported = supports(subject, key, grade)
             programs = content["programs"]
@@ -470,6 +592,23 @@ def results_screen() -> None:
                         st.info("The sequence has not been mapped for this subject yet.")
                     else:
                         st.info("The sequence to the next grade has not been mapped for these skills yet.")
+            elif key == "standing":
+                st.write("These describe published achievement levels, not an assessment of your child.")
+                for descriptor in content["standing"]:
+                    st.markdown(f"**Level {descriptor['level']}**")
+                    st.write(descriptor["text"])
+                if not content["standing"]:
+                    st.info("No achievement descriptions are loaded for this grade yet.")
+                citations = {}
+                for descriptor in content["standing"]:
+                    if descriptor.get("source_url"):
+                        pages = citations.setdefault(descriptor["source_url"], set())
+                        if descriptor.get("page") is not None:
+                            pages.add(descriptor["page"])
+                for url, pages in sorted(citations.items()):
+                    page_note = (f" — Page {min(pages)}" if len(pages) == 1 else
+                                 f" — Pages {min(pages)}–{max(pages)}") if pages else ""
+                    st.markdown(f"[California {SUBJECT_LABELS[subject].lower()} achievement descriptions]({url}){page_note}")
             elif key == "activities":
                 st.info("Sourced activities have not been added to this guide yet.")
             elif key == "programs":
@@ -608,6 +747,7 @@ def main() -> None:
             entry_screen()
             if st.session_state.stage == "results":
                 results_screen()
+                _activity_trace(st.session_state.results)
 
 
 if __name__ == "__main__":

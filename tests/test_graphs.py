@@ -89,16 +89,19 @@ def test_agent_runaway_stops_at_recursion_limit(monkeypatch: pytest.MonkeyPatch)
 @pytest.mark.parametrize("grade", [None, 0])
 def test_open_question_retrieves_prose_with_original_question(monkeypatch, grade):
     from api.services import guidance
-    search = Mock(return_value={"state": "available", "chunks": [{"text": "Use objects.", "metadata": {"page": 3}}]})
+    search = Mock(return_value={"state": "available", "chunks": [{"id": "p1", "text": "Use objects.", "metadata": {"page": 3}}]})
     monkeypatch.setattr(guidance, "search", search)
-    model = Mock(return_value=response("Children explore with objects."))
+    model = Mock(return_value=response(json.dumps({"paragraphs": [
+        {"text": "Children explore with objects.", "citations": ["p1"]},
+        {"text": "Objects make the ideas visible.", "citations": ["p1"]}]})))
     monkeypatch.setattr(llm, "cached_complete", model)
     question = "How is mathematics taught?"
     result = build_agent_graph().invoke({**state(), "question_type": "open", "question": question, "grade": grade, "goal": None})
     search.assert_called_once_with(question, "CA-CCSSM-2013", grade=grade)
-    assert result["answer"] == "Children explore with objects."
+    assert result["answer"].startswith("Children explore with objects.")
+    assert len(result["open_paragraphs"]) == 2
     assert result["tool_results"]["guidance"]["chunks"]
-    assert model.call_args.kwargs["tools"] is None
+    assert model.call_args.kwargs.get("tools") is None
     assert question in str(model.call_args.kwargs["messages"])
 
 
@@ -152,3 +155,60 @@ def test_agent_prompt_prohibits_requesting_child_data(monkeypatch):
     monkeypatch.setattr(llm, "cached_complete", model)
     build_agent_graph().invoke(state())
     assert model.call_args.kwargs["messages"][0]["content"] == SYSTEM_PROMPT
+
+
+
+def test_open_synthesis_rejects_unknown_citations(monkeypatch):
+    from api.services import guidance
+    monkeypatch.setattr(guidance, "search", Mock(return_value={"state": "available", "chunks": [
+        {"id": "real", "text": "Use objects.", "metadata": {}}]}))
+    model = Mock(return_value=response(json.dumps({"paragraphs": [
+        {"text": "A claim.", "citations": ["made-up"]},
+        {"text": "Another claim.", "citations": ["real"]}]})))
+    monkeypatch.setattr(llm, "cached_complete", model)
+    with pytest.raises(ValueError, match="unknown passage citations"):
+        build_agent_graph().invoke({**state(), "question_type": "open", "question": "How?"})
+    model.assert_called_once()
+
+
+
+def test_deterministic_trace_records_one_actual_call():
+    result = build_deterministic_graph().invoke(state())
+    events = result['activity_trace']
+    assert len(events) == 1
+    assert events[0]['tool'] == 'competition_prep'
+    assert events[0]['arguments'] == {'subject': 'math', 'grade': 4}
+    assert events[0]['result'] == result['tool_results']
+    result = build_deterministic_graph().invoke(state('hss'))
+    assert result['activity_trace'][0]['result']['state'] == 'not_published'
+
+
+def test_agent_trace_preserves_multiple_calls_and_abstention(monkeypatch):
+    first = response(call_id='first')
+    first['choices'][0]['message']['tool_calls'][0]['function']['arguments'] = json.dumps({'subject': 'hss', 'grade': 4})
+    model = Mock(side_effect=[first, response(call_id='second'), response('Finished.')])
+    monkeypatch.setattr(llm, 'cached_complete', model)
+    result = build_agent_graph().invoke(state())
+    events = result['activity_trace']
+    assert len(events) == 2
+    assert [e['call_id'] for e in events] == ['first', 'second']
+    assert events[0]['result']['state'] == 'not_published'
+    assert events[1]['result']['state'] == 'available'
+    assert events[0]['arguments']['subject'] == 'hss'
+    assert events[1]['arguments']['subject'] == 'math'
+    assert all(e['result'] == result['tool_results'][e['call_id']] for e in events)
+
+
+def test_open_abstention_has_search_trace(monkeypatch):
+    from api.services import guidance
+    outcome = {'state': 'no_relevant_content', 'reason': 'Passages do not answer this question.', 'top_score': 0.81, 'judged': True}
+    search = Mock(return_value=outcome)
+    monkeypatch.setattr(guidance, 'search', search)
+    model = Mock(side_effect=AssertionError('No synthesis after abstention'))
+    monkeypatch.setattr(llm, 'cached_complete', model)
+    result = build_agent_graph().invoke({**state(), 'question_type': 'open', 'question': 'Which school?'})
+    event, = result['activity_trace']
+    assert event['tool'] == 'search_guidance'
+    assert event['result'] == outcome
+    assert event['arguments'] == {'subject': 'math', 'question': 'Which school?', 'grade': 4}
+    model.assert_not_called()

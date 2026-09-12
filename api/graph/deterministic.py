@@ -10,6 +10,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from api.graph.state import GuideState
+from api.graph.trace import tool_event
 from api.tools.definitions import GOAL_TO_TOOL, TOOLS
 
 
@@ -21,7 +22,8 @@ def _select(state: GuideState) -> dict[str, Any]:
     args = {"subject": state["subject"], "grade": state["grade"]}
     if "domain" in selected.args:
         args["domain"] = state.get("domain")
-    return {"tool_results": selected.invoke(args)}
+    result = selected.invoke(args)
+    return {"tool_results": result, "activity_trace": [tool_event(selected.name, args, result)]}
 
 
 def _render(state: GuideState) -> dict[str, str]:

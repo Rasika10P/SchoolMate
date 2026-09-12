@@ -134,7 +134,7 @@ def test_achievement_levels_scope_framework_grade_and_subject(conn: Connection[A
                     ("b", 3, "math", 1, "other framework"),
                     ("a", 4, "math", 1, "other grade"),
                     ("a", 3, "reading", 1, "other subject")]:
-            cursor.execute("INSERT INTO achievement_descriptor VALUES (%s, %s, %s, %s, %s)", row)
+            cursor.execute("INSERT INTO achievement_descriptor (framework_id, grade, subject, level, text) VALUES (%s, %s, %s, %s, %s)", row)
     assert get_achievement_levels(conn, "a", 3) == [
         AchievementLevel("a", 3, "math", 1, "first"),
         AchievementLevel("a", 3, "math", 2, "second"),

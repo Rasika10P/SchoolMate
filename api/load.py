@@ -13,7 +13,7 @@ from psycopg import sql
 
 from api.db import get_conn, init_schema
 from api.frameworks import SUBJECT_FILES
-from api.models import AchievementLevel as AchievementDescriptor, Standard
+from api.models import AchievementDescriptor, Standard
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ def read_csv(path: Path, row_type: type[Row]) -> list[Row]:
                 values: dict[str, Any] = dict(raw)
                 for name in expected:
                     value = values[name]
-                    if name == "page" and not value.strip():
+                    if (name == "page" or (row_type is AchievementDescriptor and name == "source_url")) and not value.strip():
                         values[name] = None
                     elif not value.strip():
                         raise ValueError(f"{name} must not be empty")

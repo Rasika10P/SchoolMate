@@ -15,7 +15,8 @@ def test_csvs_are_typed_and_endpoints_exist() -> None:
     edges = load.read_csv(DATA / "progression.csv", load.ProgressionEdge)
     descriptors = load.read_csv(DATA / "ald.csv", load.AchievementDescriptor)
     assert standards
-    assert edges and descriptors == []
+    assert edges and descriptors
+    assert all(row.source_url for row in descriptors)
     endpoints = {(row.framework_id, row.code)
                  for filename, framework in load.SUBJECT_FILES.items()
                  for row in load.read_subject(DATA / filename, framework)[0]}
@@ -194,6 +195,7 @@ def partial_data(tmp_path):
         writer.writerow(['from_framework', 'from_code', 'to_framework', 'to_code', 'relation'])
         for source, target in [('3.NF.A.1', '4.NF.A.1'), ('4.NF.A.1', '5.NF.A.1'), ('3.NF.A.1', '5.NF.A.1')]:
             writer.writerow(['CA-CCSSM-2013', source, 'CA-CCSSM-2013', target, 'prerequisite'])
+    (tmp_path / "ald.csv").write_text("framework_id,grade,subject,level,text,source_url,page\n")
     return tmp_path
 
 
@@ -215,7 +217,7 @@ def test_missing_files_and_dangling_references(partial_data, loader_db, capsys):
         f.write('unknown,no-code,CA-CCSSM-2013,missing,prerequisite\n')
         f.write('CA-CCSSM-2013,missing,CA-CCSSM-2013,also-missing,prerequisite\n')
     with (partial_data / 'ald.csv').open('a') as f:
-        f.write('unknown,3,math,1,Some description\n')
+        f.write('unknown,3,math,1,Some description,,\n')
     report = load.load_data(partial_data)
     assert set(report.skipped_files) == set(load.SUBJECT_FILES) - {'maths.csv'}
     assert len(report.rejected_rows) == 3
@@ -233,7 +235,7 @@ def test_missing_files_and_dangling_references(partial_data, loader_db, capsys):
 
 def test_late_failure_rolls_back_every_insert(loader_db, partial_data):
     with (partial_data / "ald.csv").open("a") as handle:
-        handle.write("CA-CCSSM-2013,4,mathematics,2,Test-only descriptor\n")
+        handle.write("CA-CCSSM-2013,4,mathematics,2,Test-only descriptor,,\n")
     database, conn, _ = loader_db
     cursor = conn.cursor.return_value.__enter__.return_value
     insert = cursor.executemany.side_effect
@@ -264,8 +266,29 @@ def test_shared_files_can_reference_existing_database_records(partial_data, load
     with (partial_data / 'progression.csv').open('a') as f:
         f.write('existing,one,CA-CCSSM-2013,K.CC.1,prerequisite\n')
     with (partial_data / 'ald.csv').open('a') as f:
-        f.write('existing,1,math,1,Some description\n')
+        f.write('existing,1,math,1,Some description,,\n')
     report = load.load_data(partial_data)
     assert report.rejected_rows == []
     assert report.frameworks['existing']['outgoing_edges'] == 1
     assert report.frameworks['existing']['achievement_descriptor'] == 1
+
+
+def test_descriptor_nullable_source_and_page(tmp_path):
+    path = tmp_path / 'ald.csv'
+    path.write_text('framework_id,grade,subject,level,text,source_url,page\n'
+                    'f,4,math,1,Description,,\n'
+                    'f,4,math,2,Description,https://example.org/ald.pdf,14\n')
+    rows = load.read_csv(path, load.AchievementDescriptor)
+    assert rows[0].source_url is None and rows[0].page is None
+    assert rows[1].source_url == 'https://example.org/ald.pdf' and rows[1].page == 14
+
+
+def test_loaded_descriptors_keep_source_in_guidance(loader_db):
+    from dataclasses import asdict
+    from api.services.guidance import get_guidance
+    _, conn, _ = loader_db
+    load.load_data(DATA)
+    result = get_guidance(conn, 'CA-CCSSM-2013', 4)
+    assert len(result.achievement_levels) == 4
+    assert all(asdict(level)['source_url'] for level in result.achievement_levels)
+    assert all(asdict(level)['page'] is None for level in result.achievement_levels)

@@ -35,12 +35,18 @@ class ProgressionStep:
 
 
 @dataclass(frozen=True)
-class AchievementLevel:
+class AchievementDescriptor:
     framework_id: str
     grade: int
     subject: str
     level: int
     text: str
+    source_url: str | None = None
+    page: int | None = None
+
+
+# Preserve the existing service-facing name.
+AchievementLevel = AchievementDescriptor
 
 
 class UnknownStandardError(LookupError):

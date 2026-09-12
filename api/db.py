@@ -118,6 +118,8 @@ SCHEMA = (
         subject TEXT NOT NULL,
         level INT NOT NULL,
         text TEXT NOT NULL,
+        source_url TEXT,
+        page INT,
         PRIMARY KEY (framework_id, grade, subject, level)
     )""",
 )
