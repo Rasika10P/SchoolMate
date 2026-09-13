@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from api import llm
-from api.graph.extractor import extract_intent
+from api.graph.extractor import extract_intent, infer_structured_goal, looks_structured, normalize_domain
 
 
 @pytest.mark.parametrize("content,expected", [
@@ -79,3 +79,40 @@ def test_invented_math_subject_is_rejected_even_with_model_evidence(monkeypatch,
 def test_subject_cues_cover_each_subject(subject, question):
     from api.graph.extractor import subject_is_grounded
     assert subject_is_grounded(subject, question)
+
+
+@pytest.mark.parametrize("question,goal", [
+    ("Decimals are easy now; what math comes next?", "working_ahead"),
+    ("Subtraction never clicked; what foundations should we revisit?", "catching_up"),
+    ("What multiplication is expected in third grade?", "on_grade_level"),
+    ("Where can we find a science contest?", "competition_prep"),
+])
+def test_structured_goal_fallback(question, goal):
+    assert infer_structured_goal(question) == goal
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("reading-comprehension skills", "reading comprehension"),
+    ("  Life   Cycles  ", "life cycles"),
+    (None, None),
+])
+def test_domain_normalization(value, expected):
+    assert normalize_domain(value) == expected
+
+
+@pytest.mark.parametrize("question", [
+    "Which type of writting is taught for 2nd grader",
+    "What science projects should parents do at home?",
+    "My fifth grader is lost. What groundwork is missing?",
+])
+def test_structured_boundary_recovery(question):
+    assert looks_structured(question)
+
+
+@pytest.mark.parametrize("question", [
+    "Why teach fractions before decimals?",
+    "How should vocabulary be taught in context?",
+    "What should count as evidence when children study shadows?",
+])
+def test_open_explanations_remain_open(question):
+    assert not looks_structured(question)

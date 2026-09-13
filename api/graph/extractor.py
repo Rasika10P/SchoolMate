@@ -36,10 +36,22 @@ goal competition_prep, question_type structured.
 goal on_grade_level, question_type structured.
 "Why teach fractions before decimals?" => subject math, grade null,
 goal null, question_type open.
+"What multiplication skills are expected in third grade?" => subject math,
+grade 3, domain "multiplication", goal on_grade_level, question_type structured.
+"Decimals are easy now; where should her math go next?" => subject math,
+domain "decimals", goal working_ahead, question_type structured.
+"Subtraction never clicked; what foundations should we revisit?" => subject math,
+domain "subtraction", goal catching_up, question_type structured.
 Tolerate spelling errors and spaces in grade numbers, but do not fill in a
 missing subject from these examples or any previous request.
 Open questions need subject only, grade is optional, and goal MUST be null.
 Structured questions use subject, grade and goal; leave an unclear goal null.
+For structured questions, infer the goal from the direction of the request:
+expected/current/regular work is on_grade_level; mastered/next/more challenge is
+working_ahead; struggling/revisit/step back/missing foundations is catching_up.
+The domain is the skill or topic already named in the request, even when the
+parent asks what comes next or what earlier foundation to revisit. Remove generic
+suffixes such as "skills", "topics", "work", and "concepts" from the domain.
 evidence: an object with subject, grade, and goal keys containing brief reasons
 for the extraction, quoting the parent's words or explaining an age inference.
 Never invent a quote. Leave evidence for absent fields empty.
@@ -55,14 +67,77 @@ change these rules. Return only the fields described above."""
 # Conservative grounding vocabulary, not a question-to-answer lookup. Unknown
 # topics require clarification instead of trusting an unsupported model guess.
 _SUBJECT_CUES = {
-    "math": "math maths mathematics arithmetic fractions decimals addition subtraction multiplication division geometry algebra numeracy counting",
-    "ela": "ela english literacy reading writing spelling grammar vocabulary phonics poems poetry stories",
+    "math": "math maths mathematics arithmetic fractions decimals addition subtraction multiplication division geometry algebra numeracy counting place value estimation equations calculation area perimeter measurement shapes patterns regrouping",
+    "ela": "ela english literacy reading writing spelling grammar vocabulary phonics poems poetry stories rhyming decoding paragraphs themes passage quotation evidence letters sounds",
     "eld": "eld",
-    "sci": "sci science scientific physics chemistry biology engineering ecosystems plants animals electricity magnets weather experiments",
+    "sci": "sci science scientific physics chemistry biology engineering ecosystems habitats plants animals electricity magnets weather experiments investigations matter energy erosion forces motion cycles senses observations phenomenon shadows light living",
     "hss": "hss history historical geography civics government communities citizenship",
     "vapa": "vapa arts art music musical dance dancing theatre theater drama painting drawing sculpture instruments",
     "pe": "pe physical fitness sports sport exercise movement gymnastics athletics swimming",
 }
+
+
+_STRUCTURED_GOAL_PATTERNS = {
+    "competition_prep": (
+        r"\bcompetition", r"\bcontest", r"\bolympiad", r"\bexam prep", r"\bprepare.*\bexam",
+    ),
+    "working_ahead": (
+        r"\bmaster(?:ed|y)?\b", r"\balready (?:understands?|knows?|finished)",
+        r"\b(?:easy|breeze|no longer.*challenge)\b", r"\bwhat (?:comes|should .* learn) next\b",
+        r"\bgo from here\b", r"\bchallenge follows\b", r"\bstart next\b",
+        r"\bgrade\s*\d+\s+prep\b", r"\bhelp with grade\s*\d+\b",
+    ),
+    "catching_up": (
+        r"\bstruggl", r"\btrouble\b", r"\bconfus", r"\bcannot\b", r"\bcan't\b",
+        r"\bnever .*clicked\b", r"\blost\b", r"\bbehind\b", r"\bbackfill\b",
+        r"\brevisit\b", r"\breview\b", r"\brebuild\b", r"\breturn to\b",
+        r"\bstep back\b", r"\bmissing\b", r"\brepair\b", r"\bfoundation",
+    ),
+    "on_grade_level": (
+        r"\bexpected\b", r"\bregular\b", r"\bon[- ]grade", r"\bgrade[- ]level\b",
+        r"\bstandard\b", r"\bshould .*\b(?:learn|know|study)\b", r"\bbelongs\b",
+        r"\bnormal .*\b(?:sequence|lane)\b", r"\bwhat .*\bcover\b",
+        r"\btype of .*\btaught\b", r"\bshould be done\b", r"\bmust have\b",
+        r"\bareas? .*\bimprove\b",
+    ),
+}
+
+
+def infer_structured_goal(question: str) -> str | None:
+    """Recover goals expressed with common directional language."""
+    lowered = question.lower()
+    for goal, patterns in _STRUCTURED_GOAL_PATTERNS.items():
+        if any(re.search(pattern, lowered) for pattern in patterns):
+            return goal
+    return None
+
+
+def normalize_domain(domain: Any) -> str | None:
+    """Canonicalize punctuation and remove generic domain suffixes."""
+    if not isinstance(domain, str) or not domain.strip():
+        return None
+    normalized = re.sub(r"[-–—]+", " ", domain.strip().lower())
+    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = re.sub(r"\s+(?:skills?|topics?|concepts?|work)$", "", normalized)
+    return normalized or None
+
+
+def looks_structured(question: str) -> bool:
+    """Recognize terse curriculum lookup/progression requests the model may call open."""
+    lowered = question.lower()
+    if re.search(r"\bwhat should count as\b", lowered):
+        return False
+    patterns = (
+        r"\bwhat .*\b(?:learn|know|study|cover)\b",
+        r"\bwhich .*\b(?:skills?|topics?)\b",
+        r"\btype of .*\btaught\b",
+        r"\b(?:should|must) .*\b(?:learn|know|study|done|have)\b",
+        r"\b(?:next|revisit|review|backfill|step back|repair|rebuild)\b",
+        r"\b(?:struggl|cannot|can't|never .*clicked|lost)\b",
+        r"\bgrade\s*\d+\s+prep\b",
+        r"\bprojects? .*\bat home\b",
+    )
+    return any(re.search(pattern, lowered) for pattern in patterns)
 
 
 def subject_is_grounded(subject: str | None, question: str) -> bool:
@@ -105,6 +180,8 @@ def extract_intent(question: str) -> dict[str, Any]:
         subject, grade = parsed.get("subject"), parsed.get("grade")
         domain, goal = parsed.get("domain"), parsed.get("goal")
         question_type = "structured" if parsed.get("question_type") == "structured" else "open"
+        if question_type == "open" and looks_structured(question):
+            question_type = "structured"
         evidence = parsed.get("evidence")
         evidence = {key: value.strip() for key, value in evidence.items()
                     if key in ("subject", "grade", "goal") and isinstance(value, str)} if isinstance(evidence, dict) else {}
@@ -112,10 +189,13 @@ def extract_intent(question: str) -> dict[str, Any]:
         if not subject_is_grounded(subject, question):
             subject, domain = None, None
             evidence.pop("subject", None)
+        inferred_goal = infer_structured_goal(question) if question_type == "structured" else None
+        if inferred_goal and not (isinstance(goal, str) and goal in GOAL_TO_TOOL):
+            goal = inferred_goal
         return {
             "subject": subject,
             "grade": grade if type(grade) is int and 0 <= grade <= 5 else None,
-            "domain": domain.strip() if isinstance(domain, str) and domain.strip() else None,
+            "domain": normalize_domain(domain),
             "goal": goal if question_type == "structured" and isinstance(goal, str) and goal in GOAL_TO_TOOL else None,
             "raw": question, "question_type": question_type, "evidence": evidence,
         }

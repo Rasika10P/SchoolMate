@@ -1,4 +1,4 @@
-# SchoolMate minimum strong evaluation — 2026-09-12
+# SchoolMate minimum strong evaluation — targeted improvement, 2026-09-12
 
 ## Scope
 
@@ -13,32 +13,57 @@ and an intentionally disabled response cache. All 125 calls completed.
 
 | Metric | Balanced benchmark (100) | Real-world challenge (25) |
 |---|---:|---:|
-| Exact match on scored fields | 26.0% | 48.0% |
-| Question type | 96.0% | 72.0% |
-| Subject | 95.0% | 100.0% (24 scored) |
-| Grade | 100.0% | 100.0% |
-| Goal | 75.0% overall; 44.4% on structured cases | 48.0% |
-| Domain | 40.0% exact match | Not annotated |
-| Mean latency | 1.038 s | 0.978 s |
-| Estimated cost | $0.009891 | $0.002452 |
+| Exact match on scored fields | 40.0% | 72.0% |
+| Question type | 96.0% | 88.0% |
+| Subject | 93.0% | 95.8% (24 scored) |
+| Grade | 100.0% | 96.0% |
+| Goal | 96.0% overall | 76.0% |
+| Domain | 42.0% exact match | Not annotated |
+| Mean latency | 0.930 s | 0.900 s |
+| Estimated cost | $0.015871 | $0.003983 |
 
-Combined extractor cost was approximately **$0.012343**.
+Combined improved-extractor cost was approximately **$0.019853**.
 
 The balanced goal headline includes 55 open questions whose required null goal
-was always correct. On the 45 structured questions, goal accuracy was 20/45.
+was always correct, so structured-only goal performance should be inspected
+separately when iterating on the prompt.
 Domain scoring is deliberately strict string equality; semantically reasonable
 phrasing differences count as failures, so 40% should not be interpreted as a
 semantic-domain score.
 
-### Main findings
+### Targeted changes
 
-- Grade extraction is the strongest component: 125/125 across both suites.
-- Subject extraction is also strong: 95/100 balanced and 24/24 scorable challenge cases.
-- Structured/open routing is strong on controlled coverage but drops on messy
-  challenge inputs, especially misspelled lookup and capability questions.
-- Structured goal inference is the clearest actionable extractor weakness.
-- Domain results need a normalization or semantic scoring policy before being
-  used as a product-quality conclusion.
+- Added directional goal cues for mastered/next, struggling/revisit, and
+  expected/current grade-level wording.
+- Expanded conservative subject grounding with unambiguous curriculum topics
+  such as place value, textual evidence, matter, and investigations.
+- Recovered terse structured requests that the model labeled as open, while
+  preserving explanatory questions such as “what should count as evidence?”
+- Normalized domain punctuation and removed generic suffixes such as “skills.”
+
+### Before and after the targeted iteration
+
+| Metric | Baseline balanced | Improved balanced | Baseline challenge | Improved challenge |
+|---|---:|---:|---:|---:|
+| Exact match | 21% | 40% | 56% | 72% |
+| Question type | 93% | 96% | 76% | 88% |
+| Subject | 84% | 93% | 95.8% | 95.8% |
+| Grade | 100% | 100% | 100% | 96% |
+| Goal | 76% | 96% | 60% | 76% |
+| Domain | 32% | 42% | — | — |
+
+The improved LangSmith experiments contain 100 balanced and 25 challenge target
+traces with no target errors. Field evaluators may finish aggregating shortly
+after the target traces appear in the LangSmith UI.
+
+### Lessons
+
+- The balanced and contributor datasets exposed different failure modes; neither
+  score alone describes extractor quality.
+- Deterministic guardrails complement the small model for high-impact routing
+  fields, but should remain conservative and covered by boundary tests.
+- Exact domain equality still penalizes semantically equivalent wording. Domain
+  needs normalized-set or semantic agreement before it becomes a product KPI.
 
 ## Tool selection
 
@@ -49,11 +74,12 @@ execution, so no database retrieval was included.
 | Route | Accuracy | Mean latency | Provider activity | Estimated cost |
 |---|---:|---:|---:|---:|
 | Deterministic mapping | 45/45 (100%) | effectively 0 s | 0 calls | $0 |
-| GPT-4o-mini agent | 45/45 (100%) | 0.661 s | 42 calls + 3 cache hits | $0.006045 |
+| GPT-4o-mini agent | 45/45 (100%) | 0.002 s cached | 0 calls + 45 cache hits | $0 |
 
 The agent did not improve tool-selection accuracy over the fixed goal-to-tool
-mapping. For the current four-goal design, deterministic selection is equally
-accurate, faster, and cheaper. This result does not test whether an agent becomes
+mapping. The rerun reused all 45 prior cached responses; the original uncached
+run averaged 0.661 seconds and cost $0.006045. For the current four-goal design,
+deterministic selection is equally accurate, faster, and cheaper. This does not test whether an agent becomes
 valuable for future multi-intent or multi-tool requests.
 
 ## Label audit

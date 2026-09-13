@@ -52,6 +52,29 @@ Detailed results default to `reports/extractor-suites.json`. The historical
 contributor experiment remains reproducible through
 `python scripts/evaluate_extractor.py`; it is retained rather than rewritten.
 
+## LangSmith
+
+With `LANGSMITH_API_KEY`, `LANGSMITH_TRACING=true`, and
+`LANGSMITH_PROJECT=schoolmate-evals` configured in `.env`, synchronize the three
+LangSmith datasets without running models:
+
+```sh
+python -m evals.run_langsmith
+```
+
+Run experiments explicitly (these may make paid provider calls):
+
+```sh
+python -m evals.run_langsmith --run extractor
+python -m evals.run_langsmith --run extractor --suite balanced
+python -m evals.run_langsmith --run tools
+python -m evals.run_langsmith --run all
+```
+
+Stable UUIDs make synchronization idempotent. The balanced, challenge, and tool
+selection datasets remain separate so their experiment scores can be compared
+without mixing unlike coverage.
+
 ## Tool selection
 
 The 45 structured balanced cases also drive the tool-selection comparison:
